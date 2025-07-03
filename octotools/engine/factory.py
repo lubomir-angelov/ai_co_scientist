@@ -35,6 +35,11 @@ def create_llm_engine(model_string: str, use_cache: bool = False, is_multimodal:
         model_string = model_string.replace("vllm-", "")
         return ChatVLLM(model_string=model_string, use_cache=use_cache, is_multimodal=is_multimodal, **kwargs)
     
+    elif "litellm" in model_string:
+        from .litellm import ChatLiteLLM
+        model_string = model_string.replace("litellm-", "")
+        return ChatLiteLLM(model_string=model_string, use_cache=use_cache, is_multimodal=is_multimodal, **kwargs)
+
     elif "together" in model_string:
         from .together import ChatTogether
         model_string = model_string.replace("together-", "")
@@ -44,7 +49,7 @@ def create_llm_engine(model_string: str, use_cache: bool = False, is_multimodal:
         raise ValueError(
             f"Engine {model_string} not supported. "
             "If you are using Azure OpenAI models, please ensure the model string has the prefix 'azure-'. "
-            "For Together models, use 'together-'. For VLLM models, use 'vllm-'. "
+            "For Together models, use 'together-'. For VLLM models, use 'vllm-'. For LiteLLM models, use 'litellm-'. "
             "For other custom engines, you can edit the factory.py file and add its interface file. "
             "Your pull request will be warmly welcomed!"
         )
