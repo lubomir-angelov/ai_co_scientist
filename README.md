@@ -51,7 +51,7 @@ Stay tuned, we're working on the following:
 - [X] Release Python package on PyPI
 - [X] Add support for vLLM LLM
 - [X] Add support for Azure OpenAI
-- [ ] Add support for litellm LLM (to support API models)
+- [X] Add support for LiteLLM (to support API models)
 
 **TBD**: We're excited to collaborate with the community to expand OctoTools to more tools, domains, and beyond! Join our [Slack](https://join.slack.com/t/octotools/shared_invite/zt-3485ikfas-zMTbFbuodJmET~R6KXHEGw) or reach out to [Pan Lu](https://lupantech.github.io/) to get started!
 
@@ -102,9 +102,10 @@ We support a broad range of LLM engines, including GPT-4o, Claude 3.5 Sonnet, Ge
 | Gemini | `gemini-1.5-pro`, `gemini-1.5-flash-8b`, `gemini-1.5-flash`, `gemini-2.0-flash-lite`, `gemini-2.0-flash`, `gemini-2.5-pro-preview-03-25` |  |  [Gemini Models](https://ai.google.dev/gemini-api/docs/models) |
 | Grok | `grok-2-vision-1212`, `grok-2-vision`, `grok-2-vision-latest` | `grok-3-mini-fast-beta`, `grok-3-mini-fast`, `grok-3-mini-fast-latest`, `grok-3-mini-beta`, `grok-3-mini`, `grok-3-mini-latest`, `grok-3-fast-beta`, `grok-3-fast`, `grok-3-fast-latest`, `grok-3-beta`, `grok-3`, `grok-3-latest` | [Grok Models](https://docs.x.ai/docs/models#models-and-pricing) |
 | vLLM | Various vLLM-supported models, for example, `Qwen2.5-VL-3B-Instruct` and `Qwen2.5-VL-72B-Instruct`. You can also use local checkpoint models for customization and local inference. ([Example-1](https://github.com/octotools/octotools/blob/main/examples/notebooks/baseball_query_local_model_qwen.ipynb), [Example-2](https://github.com/octotools/octotools/blob/main/examples/notebooks/baseball_query_parallel_inference.ipynb))| Various vLLM-supported models, for example, `Qwen2.5-1.5B-Instruct`. You can also use local checkpoint models for customization and local inference. | [vLLM Models](https://docs.vllm.ai/en/latest/models/supported_models.html) |
+| LiteLLM | Any model supported by LiteLLM, including models from OpenAI, Anthropic, Google, Mistral, Cohere, and more. | Any model supported by LiteLLM, including models from OpenAI, Anthropic, Gemini, Mistral, Cohere, and more. | [LiteLLM Models](https://docs.litellm.ai/docs/providers) |
 
 
-> Note: If you are using TogetherAI models, please ensure have the prefix 'together-' in the model string, for example, `together-meta-llama/Llama-4-Scout-17B-16E-Instruct`.  For other custom engines, you can edit the [factory.py](https://github.com/OctoTools/OctoTools/blob/main/octotools/engine/factory.py) file and add its interface file to add support for your engine. Your pull request will be warmly welcomed! If you are using VLLM models, please ensure have the prefix 'vllm-' in the model string, for example, `vllm-meta-llama/Llama-4-Scout-17B-16E-Instruct`. 
+> Note: If you are using TogetherAI models, please ensure have the prefix 'together-' in the model string, for example, `together-meta-llama/Llama-4-Scout-17B-16E-Instruct`. For VLLM models, use the prefix 'vllm-', for example, `vllm-meta-llama/Llama-4-Scout-17B-16E-Instruct`. For LiteLLM, use the prefix 'litellm-', for example, `litellm-gpt-4o` or `litellm-claude-3-sonnet-20240229`. For other custom engines, you can edit the [factory.py](https://github.com/OctoTools/OctoTools/blob/main/octotools/engine/factory.py) file and add its interface file to add support for your engine. Your pull request will be warmly welcomed!
 
 ## Installation
 

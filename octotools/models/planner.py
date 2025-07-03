@@ -275,7 +275,7 @@ IMPORTANT: Your response MUST end with either 'Conclusion: STOP' or 'Conclusion:
 
         return stop_verification
 
-    def extract_conclusion(self, response: Any) -> str:
+    def extract_conclusion(self, response: Any) -> tuple:
         if isinstance(response, MemoryVerification):
             analysis = response.analysis
             stop_signal = response.stop_signal

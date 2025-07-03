@@ -102,8 +102,8 @@ class Solver:
 
                 if tool_name is None or tool_name not in self.planner.available_tools:
                     print(f"\n==> 🚫 Error: Tool '{tool_name}' is not available or not found.")
-                    command = "Not command is generated due to the tool not found."
-                    result = "Not result is generated due to the tool not found."
+                    command = "No command was generated because the tool was not found."
+                    result = "No result was generated because the tool was not found."
 
                 else:
                     # [3] Generate the tool command
@@ -137,7 +137,7 @@ class Solver:
 
                 # Update memory
                 self.memory.add_action(step_count, tool_name, sub_goal, command, result)
-                memeory_actions = self.memory.get_actions()
+                memory_actions = self.memory.get_actions()
 
                 # [5] Verify memory (context verification)
                 local_start_time = time.time()
@@ -160,9 +160,9 @@ class Solver:
 
             # Add memory and statistics to json_data
             json_data.update({
-                "memory": memeory_actions,
+                "memory": memory_actions,
                 "step_count": step_count,
-                "execution_time": round(time.time() - step_start_time, 2),
+                "execution_time": round(time.time() - query_start_time, 2),
             })
 
             # Generate final output if requested
