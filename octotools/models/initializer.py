@@ -149,6 +149,10 @@ class Initializer:
         except ImportError:
             raise ImportError("If you'd like to use VLLM models, please install the vllm package by running `pip install vllm`.")
         
+        # Validate config path if provided
+        if self.vllm_config_path is not None and not os.path.exists(self.vllm_config_path):
+            raise ValueError(f"VLLM config path does not exist: {self.vllm_config_path}")
+            
         # Start the VLLM server
         command = ["vllm", "serve", self.model_string.replace("vllm-", ""), "--port", "8888"]
         if self.vllm_config_path is not None:

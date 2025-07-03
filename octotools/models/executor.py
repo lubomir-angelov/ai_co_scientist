@@ -1,17 +1,18 @@
 import os
 import importlib
 import re
-from typing import Dict, Any, List
+import signal
+from typing import Dict, Any, List, Optional
 from datetime import datetime
 
 from octotools.engine.factory import create_llm_engine
 from octotools.models.formatters import ToolCommand
 
-import signal
-from typing import Dict, Any, List, Optional
-
-class TimeoutError(Exception):
-    pass
+try:
+    TimeoutError
+except NameError:
+    class TimeoutError(Exception):
+        pass
 
 def timeout_handler(signum, frame):
     raise TimeoutError("Function execution timed out")
