@@ -28,6 +28,7 @@
 
 ### News
 
+- **2025-07-03**: 📄 Added support for LiteLLM LLM. Now you can use any LiteLLM-supported models. Thanks [@axion66](https://github.com/axion66) for your contribution!
 - **2025-06-25**: 📄 Added backend support for Azure OpenAI. Thanks [@sufiyan-ahmed](https://github.com/sufiyan-ahmed) for your contribution!
 - **2025-05-21**: 📄 Added support for vLLM LLM. Now you can use any vLLM-supported models and your local checkpoint models. Check out the [example notebook](https://github.com/octotools/octotools/blob/main/examples/notebooks/baseball_query_local_model_qwen.ipynb) for more details.
 - **2025-05-19**: 📄 A great re-implementation of the OctoTools framework is available [here](https://github.com/themtok/autogen-octotools)! Thank you [Maciek Tokarski](https://github.com/themtok) for your contribution!
@@ -52,8 +53,9 @@ Stay tuned, we're working on the following:
 - [X] Add support for vLLM LLM
 - [X] Add support for Azure OpenAI
 - [X] Add support for LiteLLM (to support API models)
+- [ ] Add support for [MCP tools](https://modelcontextprotocol.io/docs/concepts/tools)
 
-**TBD**: We're excited to collaborate with the community to expand OctoTools to more tools, domains, and beyond! Join our [Slack](https://join.slack.com/t/octotools/shared_invite/zt-3485ikfas-zMTbFbuodJmET~R6KXHEGw) or reach out to [Pan Lu](https://lupantech.github.io/) to get started!
+**TBD**: We're excited to collaborate with the community to expand OctoTools to more tools, domains, and beyond! Join our [Slack](https://join.slack.com/t/octotools/shared_invite/zt-36giqfe7o-Ai8CuDOUsGN3EiLMyKzCrw) or reach out to [Pan Lu](https://lupantech.github.io/) to get started!
 
 ## Get Started
 
@@ -404,7 +406,7 @@ This project draws inspiration from several remarkable projects:
 
 ### Contributors
 
-We are truly looking forward to open-source contributions to OctoTools! If you are interested in contributing, collaborating, or reporting issues, don't hesitate to contact us at [panlu@stanford.edu](mailto:panlu@stanford.edu) or join our Slack channel [OctoTools](https://join.slack.com/t/octotools/shared_invite/zt-3485ikfas-zMTbFbuodJmET~R6KXHEGw).
+We are truly looking forward to open-source contributions to OctoTools! If you are interested in contributing, collaborating, or reporting issues, don't hesitate to contact us at [panlu@stanford.edu](mailto:panlu@stanford.edu) or join our Slack channel [OctoTools](https://join.slack.com/t/octotools/shared_invite/zt-36giqfe7o-Ai8CuDOUsGN3EiLMyKzCrw).
 
 We are also looking forward to your feedback and suggestions!
 
