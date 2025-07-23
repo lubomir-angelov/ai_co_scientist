@@ -1,34 +1,36 @@
 try:
     from ollama import Client
-    # from litellm import supports_reasoning
 except ImportError:
-    raise ImportError("If you'd like to use Ollama, please install the ollama package by running `pip install ollama`, and set appropriate API keys for the models you want to use.")
+    raise ImportError(
+        "If you'd like to use Ollama, please install the ollama package by running `pip install ollama`, and set appropriate API keys for the models you want to use."
+    )
 
-import os
 import json
-import base64
-import platformdirs
+import os
 from typing import List, Union
 
-from .base import EngineLM, CachedEngine
+import platformdirs
+from ollama import Image, Message
 
-from ollama import Image
-from ollama import Message
+from .base import CachedEngine, EngineLM
+
 
 class ChatOllama(EngineLM, CachedEngine):
     """
     Ollama implementation of the EngineLM interface.
     This allows using any model supported by Ollama.
     """
+
     DEFAULT_SYSTEM_PROMPT = "You are a helpful, creative, and smart assistant."
 
     def __init__(
         self,
         model_string="qwen2.5vl:3b",
         system_prompt=DEFAULT_SYSTEM_PROMPT,
-        is_multimodal: bool=False,
-        use_cache: bool=True,
-        **kwargs):
+        is_multimodal: bool = False,
+        use_cache: bool = True,
+        **kwargs,
+    ):
         """
         :param model_string:
         :param system_prompt:
@@ -49,32 +51,46 @@ class ChatOllama(EngineLM, CachedEngine):
 
         try:
             self.client = Client(
-                host='http://localhost:11434',
+                host="http://localhost:11434",
             )
         except Exception as e:
             raise ValueError(f"Failed to connect to Ollama server: {e}")
 
         models = self.client.list().models
         if len(models) == 0:
-            raise ValueError("No models found in the Ollama server. Please ensure the server is running and has models available.")
-        elif models[0].model != self.model_string:
-            raise ValueError(f"The Ollama server is running, but the model {self.model_string} is not available. Please check the model name and try again.")
+            raise ValueError(
+                "No models found in the Ollama server. Please ensure the server is running and has models available."
+            )
+        if self.model_string not in [model.model for model in models]:
+            raise ValueError(
+                f"The Ollama server is running, but the model {self.model_string} is not available. Please check the model name and try again."
+            )
 
-
-    def generate(self, content: Union[str, List[Union[str, bytes]]], system_prompt=None, **kwargs):
+    def generate(
+        self, content: Union[str, List[Union[str, bytes]]], system_prompt=None, **kwargs
+    ):
         if isinstance(content, str):
             return self._generate_text(content, system_prompt=system_prompt, **kwargs)
 
         elif isinstance(content, list):
-            if (not self.is_multimodal):
-                raise NotImplementedError(f"Multimodal generation is only supported for {self.model_string}.")
+            if not self.is_multimodal:
+                raise NotImplementedError(
+                    f"Multimodal generation is only supported for {self.model_string}."
+                )
 
-            return self._generate_multimodal(content, system_prompt=system_prompt, **kwargs)
+            return self._generate_multimodal(
+                content, system_prompt=system_prompt, **kwargs
+            )
 
     def _generate_text(
-        self, prompt, system_prompt=None, temperature=0, max_tokens=4000, top_p=0.99, response_format=None
+        self,
+        prompt,
+        system_prompt=None,
+        temperature=0,
+        max_tokens=4000,
+        top_p=0.99,
+        response_format=None,
     ):
-
         sys_prompt_arg = system_prompt if system_prompt else self.system_prompt
 
         if self.use_cache:
@@ -83,7 +99,6 @@ class ChatOllama(EngineLM, CachedEngine):
             if cache_or_none is not None:
                 return cache_or_none
 
-
         # Chat models without structured outputs
         response = self.client.chat(
             model=self.model_string,
@@ -91,6 +106,7 @@ class ChatOllama(EngineLM, CachedEngine):
                 {"role": "system", "content": sys_prompt_arg},
                 {"role": "user", "content": prompt},
             ],
+            format=response_format.model_json_schema() if response_format else None,
             options={
                 "frequency_penalty": 0,
                 "presence_penalty": 0,
@@ -98,7 +114,7 @@ class ChatOllama(EngineLM, CachedEngine):
                 "temperature": temperature,
                 "max_tokens": max_tokens,
                 "top_p": top_p,
-            }
+            },
         )
         response = response.message.content
 
@@ -125,11 +141,17 @@ class ChatOllama(EngineLM, CachedEngine):
         return Message(
             role="user",
             content="\n".join(text_parts) if text_parts else None,
-            images=images if images else None
+            images=images if images else None,
         )
 
     def _generate_multimodal(
-        self, content: List[Union[str, bytes]], system_prompt=None, temperature=0, max_tokens=4000, top_p=0.99, response_format=None
+        self,
+        content: List[Union[str, bytes]],
+        system_prompt=None,
+        temperature=0,
+        max_tokens=4000,
+        top_p=0.99,
+        response_format=None,
     ):
         sys_prompt_arg = system_prompt if system_prompt else self.system_prompt
         message = self._format_content(content)
@@ -140,18 +162,22 @@ class ChatOllama(EngineLM, CachedEngine):
             if cache_or_none is not None:
                 return cache_or_none
 
-
         response = self.client.chat(
             model=self.model_string,
             messages=[
                 {"role": "system", "content": sys_prompt_arg},
-                {"role": message.role, "content": message.content, "images": message.images if message.images else None},
+                {
+                    "role": message.role,
+                    "content": message.content,
+                    "images": message.images if message.images else None,
+                },
             ],
+            format=response_format.model_json_schema() if response_format else None,
             options={
                 "temperature": temperature,
                 "max_tokens": max_tokens,
                 "top_p": top_p,
-            }
+            },
         )
         response_text = response.message.content
 
