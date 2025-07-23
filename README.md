@@ -12,7 +12,7 @@
 [![GitHub license](https://img.shields.io/badge/License-MIT-green.svg?logo=github)](https://lbesson.mit-license.org/)
 [![Arxiv](https://img.shields.io/badge/arXiv-2502.11271-B31B1B.svg?logo=arxiv)](https://arxiv.org/abs/2502.11271)
 [![Huggingface Demo](https://img.shields.io/badge/Huggingface-Demo-FFD21E.svg?logo=huggingface)](https://huggingface.co/spaces/OctoTools/octotools)
-[![PyPI](https://img.shields.io/badge/octotoolkit-0.3.5-2176BC?logo=python)](https://pypi.org/project/octotoolkit/)
+[![PyPI](https://img.shields.io/badge/octotoolkit-0.3.6-2176BC?logo=python)](https://pypi.org/project/octotoolkit/)
 [![YouTube](https://img.shields.io/badge/YouTube-Tutorial-FF0000?logo=youtube)](https://www.youtube.com/watch?v=4828sGfx7dk)
 [![Website](https://img.shields.io/badge/Website-OctoTools-D41544?logo=octopusdeploy)](https://octotools.github.io/)
 [![Tool Cards](https://img.shields.io/badge/Tool_Cards-OctoTools-2176BC?logo=octopusdeploy)](https://octotools.github.io/#tool-cards)
@@ -28,11 +28,12 @@
 
 ### News
 
+- **2025-07-22**: 📄 Added support for Ollama LLM. Now you can use any Ollama-supported models. Thanks [@yeahdongcn](https://github.com/yeahdongcn) for your contribution!
 - **2025-07-03**: 📄 Added support for LiteLLM LLM. Now you can use any LiteLLM-supported models. Thanks [@axion66](https://github.com/axion66) for your contribution!
 - **2025-06-25**: 📄 Added backend support for Azure OpenAI. Thanks [@sufiyan-ahmed](https://github.com/sufiyan-ahmed) for your contribution!
 - **2025-05-21**: 📄 Added support for vLLM LLM. Now you can use any vLLM-supported models and your local checkpoint models. Check out the [example notebook](https://github.com/octotools/octotools/blob/main/examples/notebooks/baseball_query_local_model_qwen.ipynb) for more details.
 - **2025-05-19**: 📄 A great re-implementation of the OctoTools framework is available [here](https://github.com/themtok/autogen-octotools)! Thank you [Maciek Tokarski](https://github.com/themtok) for your contribution!
-- **2024-05-03**: 🏆 Excited to announce that OctoTools won the Best Paper Award at the [KnowledgeNLP Workshop - NAACL 2025](https://knowledge-nlp.github.io/naacl2025/index.html)! Check out our oral presentation slides [here](https://lupantech.github.io/docs/KnowledgeNLP_2025.05.03.pdf).
+- **2024-05-03**: 🏆 Excited to announce that OctoTools won the Best Paper Award at the [NAACL 2025 - KnowledgeNLP Workshop](https://knowledge-nlp.github.io/naacl2025/index.html)! Check out our oral presentation slides [here](https://lupantech.github.io/docs/KnowledgeNLP_2025.05.03.pdf).
 - **2025-05-01**: 📚 A comprehensive tutorial on OctoTools is now available [here](https://github.com/octotools/octotools/tree/main/tutorials). Special thanks to [@fikird](https://github.com/fikird) for creating this detailed guide!
 - **2025-04-19**: 📦 Released Python package on PyPI at [pypi.org/project/octotoolkit](https://pypi.org/project/octotoolkit)! Check out the [installation guide](https://github.com/octotools/octotools?tab=readme-ov-file#installation) for more details.
 - **2025-04-17**: 🚀 Support for a broader range of LLM engines is available now! See the full list of supported LLM engines [here](https://github.com/octotools/octotools?tab=readme-ov-file#supported-llm-engines).
@@ -53,7 +54,8 @@ Stay tuned, we're working on the following:
 - [X] Add support for vLLM LLM
 - [X] Add support for Azure OpenAI
 - [X] Add support for LiteLLM (to support API models)
-- [ ] Add support for [MCP tools](https://modelcontextprotocol.io/docs/concepts/tools)
+- [X] Add support for Ollama (to support local models)
+<!-- - [ ] Add support for [MCP tools](https://modelcontextprotocol.io/docs/concepts/tools) -->
 
 **TBD**: We're excited to collaborate with the community to expand OctoTools to more tools, domains, and beyond! Join our [Slack](https://join.slack.com/t/octotools/shared_invite/zt-36giqfe7o-Ai8CuDOUsGN3EiLMyKzCrw) or reach out to [Pan Lu](https://lupantech.github.io/) to get started!
 
@@ -105,9 +107,10 @@ We support a broad range of LLM engines, including GPT-4o, Claude 3.5 Sonnet, Ge
 | Grok | `grok-2-vision-1212`, `grok-2-vision`, `grok-2-vision-latest` | `grok-3-mini-fast-beta`, `grok-3-mini-fast`, `grok-3-mini-fast-latest`, `grok-3-mini-beta`, `grok-3-mini`, `grok-3-mini-latest`, `grok-3-fast-beta`, `grok-3-fast`, `grok-3-fast-latest`, `grok-3-beta`, `grok-3`, `grok-3-latest` | [Grok Models](https://docs.x.ai/docs/models#models-and-pricing) |
 | vLLM | Various vLLM-supported models, for example, `Qwen2.5-VL-3B-Instruct` and `Qwen2.5-VL-72B-Instruct`. You can also use local checkpoint models for customization and local inference. ([Example-1](https://github.com/octotools/octotools/blob/main/examples/notebooks/baseball_query_local_model_qwen.ipynb), [Example-2](https://github.com/octotools/octotools/blob/main/examples/notebooks/baseball_query_parallel_inference.ipynb))| Various vLLM-supported models, for example, `Qwen2.5-1.5B-Instruct`. You can also use local checkpoint models for customization and local inference. | [vLLM Models](https://docs.vllm.ai/en/latest/models/supported_models.html) |
 | LiteLLM | Any model supported by LiteLLM, including models from OpenAI, Anthropic, Google, Mistral, Cohere, and more. | Any model supported by LiteLLM, including models from OpenAI, Anthropic, Gemini, Mistral, Cohere, and more. | [LiteLLM Models](https://docs.litellm.ai/docs/providers) |
+| Ollama | Any model supported by Ollama, including `DeepSeek-R1`, `Qwen 3`, `Llama 3.3`, `Qwen 2.5‑VL`, `Gemma 3`, and other models. | Any model supported by Ollama. | [Ollama Models](https://ollama.ai/library) |
 
 
-> Note: If you are using TogetherAI models, please ensure have the prefix 'together-' in the model string, for example, `together-meta-llama/Llama-4-Scout-17B-16E-Instruct`. For VLLM models, use the prefix 'vllm-', for example, `vllm-meta-llama/Llama-4-Scout-17B-16E-Instruct`. For LiteLLM, use the prefix 'litellm-', for example, `litellm-gpt-4o` or `litellm-claude-3-sonnet-20240229`. For other custom engines, you can edit the [factory.py](https://github.com/OctoTools/OctoTools/blob/main/octotools/engine/factory.py) file and add its interface file to add support for your engine. Your pull request will be warmly welcomed!
+> Note: If you are using TogetherAI models, please ensure have the prefix 'together-' in the model string, for example, `together-meta-llama/Llama-4-Scout-17B-16E-Instruct`. For VLLM models, use the prefix 'vllm-', for example, `vllm-meta-llama/Llama-4-Scout-17B-16E-Instruct`. For LiteLLM, use the prefix 'litellm-', for example, `litellm-gpt-4o` or `litellm-claude-3-sonnet-20240229`. For Ollama, use the prefix 'ollama-', for example, `ollama-qwen3:latest`. For other custom engines, you can edit the [factory.py](https://github.com/OctoTools/OctoTools/blob/main/octotools/engine/factory.py) file and add its interface file to add support for your engine. Your pull request will be warmly welcomed!
 
 ## Installation
 
