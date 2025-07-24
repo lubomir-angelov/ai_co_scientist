@@ -1,11 +1,14 @@
+import json
 import os
 import re
+from typing import Any, Dict, List, Tuple
+
 from PIL import Image
-from typing import Dict, Any, List, Tuple
 
 from octotools.engine.factory import create_llm_engine
+from octotools.models.formatters import MemoryVerification, NextStep, QueryAnalysis
 from octotools.models.memory import Memory
-from octotools.models.formatters import QueryAnalysis, NextStep, MemoryVerification
+
 
 class Planner:
     def __init__(self, llm_engine_name: str, toolbox_metadata: dict = None, available_tools: List = None, verbose: bool = False):
@@ -97,18 +100,27 @@ Please present your analysis in a clear, structured format.
                 if tool.lower() in tool_name.lower():
                     return tool
             return "No matched tool given: " + tool_name
-        
+
         try:
+            if isinstance(response, str):
+                # Attempt to parse the response as JSON
+                try:
+                    response_dict = json.loads(response)
+                    response = NextStep(**response_dict)
+                except Exception as e:
+                    print(f"Failed to parse response as JSON: {str(e)}")
             if isinstance(response, NextStep):
+                print("arielg 1")
                 context = response.context.strip()
                 sub_goal = response.sub_goal.strip()
                 tool_name = response.tool_name.strip()
             else:
+                print("arielg 2")
                 text = response.replace("**", "")
 
                 # Pattern to match the exact format
                 pattern = r"Context:\s*(.*?)Sub-Goal:\s*(.*?)Tool Name:\s*(.*?)(?=\n\n|\Z)"
-                
+
                 # Find all matches
                 matches = re.findall(pattern, text, re.DOTALL)
 
@@ -122,7 +134,7 @@ Please present your analysis in a clear, structured format.
             return None, None, None
 
         return context, sub_goal, tool_name
-        
+
     def generate_next_step(self, question: str, image: str, query_analysis: str, memory: Memory, step_count: int, max_step_count: int) -> Any:
         prompt_generate_next_step = f"""
 Task: Determine the optimal next step to address the given query based on the provided analysis, available tools, and previous steps taken.
@@ -248,13 +260,13 @@ Detailed Instructions:
 Response Format:
 
 If the memory is complete, accurate, AND verified:
-Explanation: 
+Explanation:
 <Provide a detailed explanation of why the memory is sufficient. Reference specific information from the memory and explain its relevance to each aspect of the task. Address how each main point of the query has been satisfied.>
 
 Conclusion: STOP
 
 If the memory is incomplete, insufficient, or requires further verification:
-Explanation: 
+Explanation:
 <Explain in detail why the memory is incomplete. Identify specific information gaps or unaddressed aspects of the query. Suggest which additional tools could be used, how they might contribute, and why their input is necessary for a comprehensive response.>
 
 Conclusion: CONTINUE
@@ -276,6 +288,13 @@ IMPORTANT: Your response MUST end with either 'Conclusion: STOP' or 'Conclusion:
         return stop_verification
 
     def extract_conclusion(self, response: Any) -> tuple:
+        if isinstance(response, str):
+            # Attempt to parse the response as JSON
+            try:
+                response_dict = json.loads(response)
+                response = MemoryVerification(**response_dict)
+            except Exception as e:
+                print(f"Failed to parse response as JSON: {str(e)}")
         if isinstance(response, MemoryVerification):
             analysis = response.analysis
             stop_signal = response.stop_signal
@@ -295,7 +314,7 @@ IMPORTANT: Your response MUST end with either 'Conclusion: STOP' or 'Conclusion:
                 conclusion = matches[-1].group(1).upper()
                 if conclusion in ['STOP', 'CONTINUE']:
                     return analysis, conclusion
-            
+
             # If no valid conclusion found, search for STOP or CONTINUE anywhere in the text
             if 'stop' in response.lower():
                 return analysis, 'STOP'
@@ -394,4 +413,3 @@ Answer:
         final_output = self.llm_engine_mm(input_data)
 
         return final_output
-    
