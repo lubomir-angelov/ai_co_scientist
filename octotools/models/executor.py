@@ -1,9 +1,10 @@
-import os
 import importlib
+import json
+import os
 import re
 import signal
-from typing import Dict, Any, List, Optional
 from datetime import datetime
+from typing import Any, Dict, List, Optional
 
 from octotools.engine.factory import create_llm_engine
 from octotools.models.formatters import ToolCommand
@@ -33,7 +34,7 @@ class Executor:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             self.query_cache_dir = os.path.join(self.root_cache_dir, timestamp)
         os.makedirs(self.query_cache_dir, exist_ok=True)
-    
+
     def generate_tool_command(self, question: str, image: str, context: str, sub_goal: str, tool_name: str, tool_metadata: Dict[str, Any]) -> Any:
         prompt_generate_tool_command = f"""
 Task: Generate a precise command to execute the selected tool based on the given information.
@@ -145,7 +146,14 @@ Remember: Your response MUST end with the Generated Command, which should be val
         def normalize_code(code: str) -> str:
             # Remove leading and trailing whitespace and triple backticks
             return re.sub(r'^```python\s*', '', code).rstrip('```').strip()
-        
+
+        if isinstance(response, str):
+            # Attempt to parse the response as JSON
+            try:
+                response_dict = json.loads(response)
+                response = ToolCommand(**response_dict)
+            except Exception as e:
+                print(f"Failed to parse response as JSON: {str(e)}")
         if isinstance(response, ToolCommand):
             analysis = response.analysis.strip()
             explanation = response.explanation.strip()
@@ -172,26 +180,26 @@ Remember: Your response MUST end with the Generated Command, which should be val
         """
         Execute a tool command with timeout protection. If execution exceeds max_time seconds,
         the function will be interrupted and return a timeout message.
-        
+
         Args:
             tool_name (str): Name of the tool to execute
             command (str): Command string containing tool.execute() calls
-            
+
         Returns:
             Any: List of execution results or error message
         """
-        
+
         def split_commands(command: str) -> List[str]:
             # Use regex to find all tool.execute() commands and their surrounding code
             pattern = r'.*?execution\s*=\s*tool\.execute\([^\n]*\)\s*(?:\n|$)'
             blocks = re.findall(pattern, command, re.DOTALL)
             return [block.strip() for block in blocks if block.strip()]
-        
+
         def execute_with_timeout(block: str, local_context: dict) -> Optional[str]:
             # Set up the timeout handler
             signal.signal(signal.SIGALRM, timeout_handler)
             signal.alarm(self.max_time)
-            
+
             try:
                 # Execute the block in the local context
                 exec(block, globals(), local_context)
@@ -221,7 +229,7 @@ Remember: Your response MUST end with the Generated Command, which should be val
             else:
                 # Instantiate the tool without model_string for tools that don't require it
                 tool = tool_class()
-            
+
             # Set the custom output directory
             # NOTE: May have a better way to handle this
             tool.set_custom_output_dir(self.query_cache_dir)
@@ -236,7 +244,7 @@ Remember: Your response MUST end with the Generated Command, which should be val
 
                 # Execute the block with timeout protection
                 result = execute_with_timeout(block, local_context)
-                
+
                 if result is not None:
                     executions.append(result)
                 else:

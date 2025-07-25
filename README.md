@@ -33,7 +33,7 @@
 - **2025-06-25**: 📄 Added backend support for Azure OpenAI. Thanks [@sufiyan-ahmed](https://github.com/sufiyan-ahmed) for your contribution!
 - **2025-05-21**: 📄 Added support for vLLM LLM. Now you can use any vLLM-supported models and your local checkpoint models. Check out the [example notebook](https://github.com/octotools/octotools/blob/main/examples/notebooks/baseball_query_local_model_qwen.ipynb) for more details.
 - **2025-05-19**: 📄 A great re-implementation of the OctoTools framework is available [here](https://github.com/themtok/autogen-octotools)! Thank you [Maciek Tokarski](https://github.com/themtok) for your contribution!
-- **2024-05-03**: 🏆 Excited to announce that OctoTools won the Best Paper Award at the [NAACL 2025 - KnowledgeNLP Workshop](https://knowledge-nlp.github.io/naacl2025/index.html)! Check out our oral presentation slides [here](https://lupantech.github.io/docs/KnowledgeNLP_2025.05.03.pdf).
+- **2025-05-03**: 🏆 Excited to announce that OctoTools won the Best Paper Award at the [NAACL 2025 - KnowledgeNLP Workshop](https://knowledge-nlp.github.io/naacl2025/index.html)! Check out our oral presentation slides [here](https://lupantech.github.io/docs/KnowledgeNLP_2025.05.03.pdf).
 - **2025-05-01**: 📚 A comprehensive tutorial on OctoTools is now available [here](https://github.com/octotools/octotools/tree/main/tutorials). Special thanks to [@fikird](https://github.com/fikird) for creating this detailed guide!
 - **2025-04-19**: 📦 Released Python package on PyPI at [pypi.org/project/octotoolkit](https://pypi.org/project/octotoolkit)! Check out the [installation guide](https://github.com/octotools/octotools?tab=readme-ov-file#installation) for more details.
 - **2025-04-17**: 🚀 Support for a broader range of LLM engines is available now! See the full list of supported LLM engines [here](https://github.com/octotools/octotools?tab=readme-ov-file#supported-llm-engines).
@@ -77,7 +77,7 @@ Excited to have a tutorial video for OctoTools covered by [Discover AI](https://
 
 ### Introduction
 
-We introduce **OctoTools**, a training-free, user-friendly, and easily extensible open-source agentic framework designed to tackle complex reasoning across diverse domains. **OctoTools** introduces standardized **tool cards** to encapsulate tool functionality, a **planner** for both high-level and low-level planning, and an **executor** to carry out tool usage. 
+We introduce **OctoTools**, a training-free, user-friendly, and easily extensible open-source agentic framework designed to tackle complex reasoning across diverse domains. **OctoTools** introduces standardized **tool cards** to encapsulate tool functionality, a **planner** for both high-level and low-level planning, and an **executor** to carry out tool usage.
 
 **Tool cards** define tool-usage metadata and encapsulate heterogeneous tools, enabling training-free integration of new tools without additional training or framework refinement. (2) The **planner** governs both high-level and low-level planning to address the global objective and refine actions step by step. (3) The **executor** instantiates tool calls by generating executable commands and save structured results in the context. The final answer is summarized from the full trajectory in the context. Furthermore, the *task-specific toolset optimization algorithm* learns a beneficial subset of tools for downstream tasks.
 
@@ -86,7 +86,7 @@ We introduce **OctoTools**, a training-free, user-friendly, and easily extensibl
 
 We validate **OctoTools**' generality across 16 diverse tasks (including MathVista, MMLU-Pro, MedQA, and GAIA-Text), achieving substantial average accuracy gains of 9.3% over GPT-4o. Furthermore, **OctoTools** also outperforms AutoGen, GPT-Functions and LangChain by up to 10.6% when given the same set of tools.
 
-<p align="center">  
+<p align="center">
     <img src="https://raw.githubusercontent.com/octotools/octotools/refs/heads/main/assets/result/main_scores_bar_chart.png" width="50%">
     <!-- Text. -->
 </p>
@@ -151,7 +151,7 @@ DINO_KEY=<your-dino-key-here>
 Obtain a Google API Key and Google CX according to the [Google Custom Search API](https://developers.google.com/custom-search/v1/overview) documation.
 
 
-### 2. Editable Installation 
+### 2. Editable Installation
 
 Start with a fresh new environment:
 ```sh
@@ -303,7 +303,7 @@ We provide a set of in-depth analyses to help you understand the framework. For 
 
 We provide a set of example visualizations to help you understand the framework. Explore them at the [project page](https://octotools.github.io/#visualization).
 
-<p align="center">  
+<p align="center">
     <a href="https://octotools.github.io/#visualization">
         <img src="https://raw.githubusercontent.com/octotools/octotools/refs/heads/main/assets/result/example_visualization.png" width="80%">
     </a>

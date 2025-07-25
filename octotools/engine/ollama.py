@@ -37,7 +37,9 @@ class ChatOllama(EngineLM, CachedEngine):
         :param is_multimodal:
         """
 
-        self.model_string = model_string
+        self.model_string = (
+            model_string if ":" in model_string else f"{model_string}:latest"
+        )
         self.use_cache = use_cache
         self.system_prompt = system_prompt
         self.is_multimodal = is_multimodal
@@ -62,9 +64,13 @@ class ChatOllama(EngineLM, CachedEngine):
                 "No models found in the Ollama server. Please ensure the server is running and has models available."
             )
         if self.model_string not in [model.model for model in models]:
-            raise ValueError(
-                f"The Ollama server is running, but the model {self.model_string} is not available. Please check the model name and try again."
+            print(
+                f"Model '{self.model_string}' not found. Attempting to pull it from the Ollama registry."
             )
+            try:
+                self.client.pull(self.model_string)
+            except Exception as e:
+                raise ValueError(f"Failed to pull model '{self.model_string}': {e}")
 
     def generate(
         self, content: Union[str, List[Union[str, bytes]]], system_prompt=None, **kwargs
