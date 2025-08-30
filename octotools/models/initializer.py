@@ -15,11 +15,12 @@ class Initializer:
         self.verbose = verbose
         self.vllm_server_process = None
         self.vllm_config_path = vllm_config_path
+        self.tool_directory_mapping = {}  # Maps tool class names to their directory names
         print("\n==> Initializing octotools...")
         print(f"Enabled tools: {self.enabled_tools}")
         print(f"LLM engine name: {self.model_string}")
         self._set_up_tools()
-        
+
         # if vllm, set up the vllm server
         if model_string.startswith("vllm-"):
             self.setup_vllm_server()
@@ -65,13 +66,16 @@ class Initializer:
                     for name, obj in inspect.getmembers(module):
                         if inspect.isclass(obj) and name.endswith('Tool') and name != 'BaseTool':
                             print(f"Found tool class: {name}")
+                            # Store the directory mapping for later use in run_demo_commands
+                            directory_name = os.path.basename(root)
+                            self.tool_directory_mapping[name] = directory_name
                             try:
                                 # Check if the tool requires an LLM engine
                                 if hasattr(obj, 'require_llm_engine') and obj.require_llm_engine:
                                     tool_instance = obj(model_string=self.model_string)
                                 else:
                                     tool_instance = obj()
-                                
+
                                 self.toolbox_metadata[name] = {
                                     'tool_name': getattr(tool_instance, 'tool_name', 'Unknown'),
                                     'tool_description': getattr(tool_instance, 'tool_description', 'No description'),
@@ -100,8 +104,12 @@ class Initializer:
             print(f"Checking availability of {tool_name}...")
 
             try:
-                # Import the tool module
-                module_name = f"tools.{tool_name.lower().replace('_tool', '')}.tool"
+                # Import the tool module using the stored directory mapping
+                directory_name = self.tool_directory_mapping.get(tool_name)
+                if directory_name is None:
+                    # Fallback to the old logic if mapping is not found
+                    directory_name = tool_name.lower().replace('_tool', '')
+                module_name = f"tools.{directory_name}.tool"
                 module = importlib.import_module(module_name)
 
                 # Get the tool class
