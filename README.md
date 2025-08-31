@@ -62,7 +62,7 @@ Stay tuned, we're working on the following:
 ## Get Started
 
 ### Step-by-step Tutorial
-Here is a detaild explanation and tutorial on octotools [here](https://github.com/octotools/octotools/tree/main/tutorials).
+Here is a detailed explanation and tutorial on octotools [here](https://github.com/octotools/octotools/tree/main/tutorials).
 
 ### YouTube Tutorial
 
@@ -148,7 +148,7 @@ GOOGLE_CX=<your-cx-here>
 DINO_KEY=<your-dino-key-here>
 ```
 
-Obtain a Google API Key and Google CX according to the [Google Custom Search API](https://developers.google.com/custom-search/v1/overview) documation.
+Obtain a Google API Key and Google CX according to the [Google Custom Search API](https://developers.google.com/custom-search/v1/overview) documentation.
 
 
 ### 2. Editable Installation
@@ -326,7 +326,7 @@ To customize **OctoTools** for your own tasks:
 
 2. **Replace or update existing tools**: You can replace or update tools in the toolbox. For example, we provide the [`Object_Detector_Tool`](https://github.com/octotools/OctoTools/blob/main/octotools/tools/object_detector/tool.py) to detect objects in images using an open-source model. We also provide an alternative tool called the [`Advanced_Object_Detector_Tool`](https://github.com/OctoTools/OctoTools/blob/main/octotools/tools/advanced_object_detector/tool.py) to detect objects in images using API calls.
 
-3. **Enable tools for your tasks**: You can enable the whole toolset or a subset of tools for your own tasks by setting the `enabled_tools` argument in [tasks/solve.py](https://github.com/octotools/OctoTools/blob/main/octotools/tasks/solve.py).
+3. **Enable tools for your tasks**: You can enable the whole toolset or a subset of tools for your own tasks by setting the `enabled_tools` argument in [tasks/solve.py](https://github.com/octotools/OctoTools/blob/main/tasks/solve.py).
 
 
 ## Resources
