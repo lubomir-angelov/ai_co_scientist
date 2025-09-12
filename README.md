@@ -148,7 +148,7 @@ GOOGLE_CX=<your-cx-here>
 DINO_KEY=<your-dino-key-here>
 ```
 
-Obtain a Google API Key and Google CX according to the [Google Custom Search API](https://developers.google.com/custom-search/v1/overview) documentation.
+Obtain a Google API Key and Google CX according to the [Google Custom Search API](https://developers.google.com/custom-search/v1/overview) documentation and [Programmable Search Engine Page](https://programmablesearchengine.google.com/controlpanel/all). More details are available in the [Google Search Tool](https://github.com/octotools/octotools/tree/main/octotools/tools/google_search/doc/readme.md) documentation.
 
 
 ### 2. Editable Installation
