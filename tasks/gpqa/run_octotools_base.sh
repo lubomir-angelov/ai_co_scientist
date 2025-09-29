@@ -7,7 +7,7 @@ PROJECT_DIR="./"
 LABEL="octotools_base"
 
 THREADS=8
-TASK="gpa"
+TASK="gpqa"
 DATA_FILE="$TASK/data/data.json"
 LOG_DIR="$TASK/logs/$LABEL"
 OUT_DIR="$TASK/results/$LABEL"
