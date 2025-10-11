@@ -33,7 +33,7 @@ Before using the Google Search Tool, you need to set up:
 
 ### Step 2: Create Custom Search Engine
 
-1. Visit [Google Programmable Search Engine](https://cse.google.com/)
+1. Visit [Google Programmable Search Engine](https://programmablesearchengine.google.com)
 2. Click "Add" to create a new search engine
 
 ![Add Search Engine](add_a_search_engine.png)
