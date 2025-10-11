@@ -23,9 +23,9 @@ Before using the Google Search Tool, you need to set up:
 ### Step 1: Get Google API Key
 
 1. Visit the [Google Custom Search API documentation](https://developers.google.com/custom-search/v1/introduction)
-2. Go to the [Google Cloud Console](https://console.cloud.google.com/)
-3. Create a new project or select an existing one
-4. Enable the "Custom Search JSON API"
+2. Go to the [Identify your application to Google with API key](https://developers.google.com/custom-search/v1/introduction#identify_your_application_to_google_with_api_key)
+3. Click "Get a Key"
+4. Create a new project or select an existing one
 5. Create credentials (API Key)
 6. Copy your API key
 
