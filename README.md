@@ -66,8 +66,8 @@ from vendor.octotools.core.executor import Executor
 
 ### When using from a venv or within a container:
 
-1. We need vendor on PYTHONPATH in the orchestrator container/runtime.
-2. We need vendor/octotools to be copied into the Docker build context.
+1. We need vendor/octotools/octotools on PYTHONPATH in the orchestrator container/runtime.
+2. We need vendor/octotools/octotools to be copied into the Docker build context.
 
 
 # Working with this repo and the submodule
