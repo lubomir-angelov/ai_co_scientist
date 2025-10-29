@@ -13,6 +13,7 @@ An additional feature is the ability to run consumer-grade hardware.
 # Setup
 The reository structure is as follows:
 
+```
 octotools-extended/
 ├── docker-compose.yml
 ├── services/
@@ -29,7 +30,50 @@ octotools-extended/
 │   └── ocr/
 └── vendor/
     └── octotools/   <-- git submodule of the original repo
+```
 
+## init the vendor
+```bash
+# create vendor/ if it doesn't exist yet
+mkdir -p vendor
+
+# add octotools as a submodule inside vendor/
+git submodule add https://github.com/octotools/octotools.git vendor/octotools
+
+# add and commit the submodule files
+git add .gitmodules vendor/octotools
+git commit -m "Add OctoTools as submodule under vendor/octotools"
+```
+
+At this point:
+
+The repo tracks which commit of OctoTools it's pinned to.
+
+We are referencing a specific commit from their repo.
+
+## using the submodule in the other code
+
+```python
+from vendor.octotools.core.planner import Planner
+from vendor.octotools.core.executor import Executor
+```
+
+## Notes:
+
+When using from a venv or in Docker:
+
+1. We need vendor on PYTHONPATH in the orchestrator container/runtime.
+2. We need vendor/octotools to be copied into the Docker build context.
+
+# Working with this repo with the submodule
+
+```bash
+git clone <your-repo-url> octotools-extended
+cd octotools-extended
+
+# fetch submodule contents
+git submodule update --init --recursive
+```
 
 # Citation
 
