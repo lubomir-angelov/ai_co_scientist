@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "shared-library"
+version = "0.1.0"
+description = "Shared Library for the AI co-scientist services (OCR, memory, etc.)"
+readme = ""
+requires-python = ">=3.13"
+license = { text = "Proprietary" }
+authors = [
+    { name = "Your Name", email = "you@example.com" }
+]
+
+dependencies = [
+    "pydantic>=2.6,<3.0",
+]
+
+# This tells installers where the importable code actually lives.
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["common_contracts*"]
+exclude = ["tests*"]
+
+[tool.setuptools.package-data]
+common_contracts = []
