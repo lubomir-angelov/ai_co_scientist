@@ -23,8 +23,8 @@ package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
-include = ["common_contracts*"]
+include = ["shared_library*"]
 exclude = ["tests*"]
 
 [tool.setuptools.package-data]
-common_contracts = []
+shared_library = []
