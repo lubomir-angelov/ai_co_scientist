@@ -182,3 +182,12 @@ examples/notebooks/local_model/*
 
 #Vscode settings
 .vscode/
+
+
+# local data artifacts
+**/models
+**/data
+**/local
+**/resources
+**/outputs
+**/logs
