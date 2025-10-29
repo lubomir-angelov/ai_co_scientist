@@ -10,7 +10,7 @@ The agent focuses on three main capabilities:
   
 An additional feature is the ability to run consumer-grade hardware.
 
-# Setup
+# Structure
 The reository structure is as follows:
 
 ```
@@ -32,7 +32,11 @@ octotools-extended/
     └── octotools/   <-- git submodule of the original repo
 ```
 
-## init the vendor
+## Add an external vendor
+We are adding octools as an external submodule to use in this repo. 
+
+Currently we are using it "as is" but we are planning to add changes in the near future, at that point see [here](#working-with-this-repo-with-the-submoduleWorking with this repo with the submodule)
+
 ```bash
 # create vendor/ if it doesn't exist yet
 mkdir -p vendor
@@ -51,21 +55,24 @@ The repo tracks which commit of OctoTools it's pinned to.
 
 We are referencing a specific commit from their repo.
 
-## using the submodule in the other code
+
+### Using the submodule other parts of the repo:
 
 ```python
 from vendor.octotools.core.planner import Planner
 from vendor.octotools.core.executor import Executor
 ```
 
-## Notes:
 
-When using from a venv or in Docker:
+### When using from a venv or within a container:
 
 1. We need vendor on PYTHONPATH in the orchestrator container/runtime.
 2. We need vendor/octotools to be copied into the Docker build context.
 
-# Working with this repo with the submodule
+
+# Working with this repo and the submodule
+
+To work with the repo you need to pull and initialize the external submodule:
 
 ```bash
 git clone https://github.com/lubomir-angelov/ai_co_scientist.git 
@@ -77,7 +84,9 @@ git submodule update --init --recursive
 
 This is how Git pulls down the exact commit of OctoTools we’re pinned to.
 
-If you skip this step, vendor/octotools exists but is empty-ish. That’s the #1 “why is my import failing?” confusion with submodules.
+If you skip this step, vendor/octotools exists but is empty-ish. 
+
+In that case the imports will start failing.
 
 # Updating OctoTools to a newer upstream commit
 
@@ -96,22 +105,27 @@ cd ../..  # back to repo root
 git add vendor/octotools
 git commit -m "Bump octotools submodule to latest main"
 ```
+
+At this point we have: 
+
 - moved the submodule’s pointer to a newer commit.
 - committed that pointer change in your main repo.
 
-Anyone who pulls this repo and runs:
+Anyone who pulls after this point this repo and runs:
 
 ```bash
 git pull
 git submodule update --init --recursive
 ```
-will now get the new OctoTools commit.
+
+Will now get the new OctoTools commit.
+
 
 # Making local modifications to OctoTools
 
-Eventually, we’re going to want to hack OctoTools (inject memory calls, add provenance enforcement, etc.).
+Eventually, we’re going to hack OctoTools (inject memory calls, add provenance enforcement, etc.).
 
-We will treat vendor/octotools as our fork
+At that point of time, we will treat vendor/octotools as a fork.
 
 We can make changes directly in vendor/octotools and commit them there.
 
@@ -133,17 +147,20 @@ git add vendor/octotools
 git commit -m "Use customized octotools with memory injection"
 ```
 
-This main repo now points at a custom commit hash. 
+This main repo will then point at a custom commit hash. 
 
-Anyone who clones and runs git submodule update --init --recursive will get the modified version, not upstream main.
+Anyone who clones and runs 
+```git submodule update --init --recursive``` will get the modified version, not upstream main.
 
-At this point, vendor/octotools is effectively a fork living inside this project.
+At that point, vendor/octotools is effectively a fork living inside this project.
 
 # Citation
 
+```
 @article{lu2025octotools,
     title={OctoTools: An Agentic Framework with Extensible Tools for Complex Reasoning},
     author={Lu, Pan and Chen, Bowen and Liu, Sheng and Thapa, Rahul and Boen, Joseph and Zou, James},
     journal = {arXiv preprint arXiv:2502.11271},
     year={2025}
 }
+```
