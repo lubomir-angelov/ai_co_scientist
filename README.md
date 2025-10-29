@@ -68,12 +68,76 @@ When using from a venv or in Docker:
 # Working with this repo with the submodule
 
 ```bash
-git clone <your-repo-url> octotools-extended
-cd octotools-extended
+git clone https://github.com/lubomir-angelov/ai_co_scientist.git 
+cd ai_co_scientist
 
 # fetch submodule contents
 git submodule update --init --recursive
 ```
+
+This is how Git pulls down the exact commit of OctoTools we’re pinned to.
+
+If you skip this step, vendor/octotools exists but is empty-ish. That’s the #1 “why is my import failing?” confusion with submodules.
+
+# Updating OctoTools to a newer upstream commit
+
+Let’s say OctoTools released improvements and we want to pull them in.
+
+```bash
+cd vendor/octotools
+
+# pull latest from its default branch (e.g. main)
+git fetch origin
+git checkout main
+git pull origin main
+# now vendor/octotools is at a newer commit
+
+cd ../..  # back to repo root
+git add vendor/octotools
+git commit -m "Bump octotools submodule to latest main"
+```
+- moved the submodule’s pointer to a newer commit.
+- committed that pointer change in your main repo.
+
+Anyone who pulls this repo and runs:
+
+```bash
+git pull
+git submodule update --init --recursive
+```
+will now get the new OctoTools commit.
+
+# Making local modifications to OctoTools
+
+Eventually, we’re going to want to hack OctoTools (inject memory calls, add provenance enforcement, etc.).
+
+We will treat vendor/octotools as our fork
+
+We can make changes directly in vendor/octotools and commit them there.
+
+```bash
+cd vendor/octotools
+git checkout -b my-custom-agent
+# edit planner.py, executor.py, etc.
+git commit -am "Inject memory pre-query step"
+```
+
+
+Now, vendor/octotools has commits that don’t exist upstream.
+
+From the root:
+
+```bash
+cd ../..   # back to repo root
+git add vendor/octotools
+git commit -m "Use customized octotools with memory injection"
+```
+
+This main repo now points at a custom commit hash. 
+
+Anyone who clones and runs git submodule update --init --recursive will get the modified version, not upstream main.
+
+At this point, vendor/octotools is effectively a fork living inside this project.
 
 # Citation
 
