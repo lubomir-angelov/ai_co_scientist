@@ -14,7 +14,7 @@ authors = [
 ]
 
 dependencies = [
-    "pydantic>=2.6,<3.0",
+    "pydantic==2.12.3",
 ]
 
 # This tells installers where the importable code actually lives.
@@ -28,3 +28,6 @@ exclude = ["tests*"]
 
 [tool.setuptools.package-data]
 shared_library = []
+
+[tool.setuptools.dynamic]
+version = { attr = "shared_library.__about__.__version__" }
