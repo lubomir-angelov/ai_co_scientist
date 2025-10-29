@@ -14,7 +14,7 @@ An additional feature is the ability to run consumer-grade hardware.
 The reository structure is as follows:
 
 ```
-octotools-extended/
+ai_co_scientist/
 ├── docker-compose.yml
 ├── services/
 │   ├── orchestrator/
