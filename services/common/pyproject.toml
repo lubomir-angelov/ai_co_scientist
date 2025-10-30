@@ -28,6 +28,3 @@ exclude = ["tests*"]
 
 [tool.setuptools.package-data]
 shared_library = []
-
-[tool.setuptools.dynamic]
-version = { attr = "shared_library.__about__.__version__" }
