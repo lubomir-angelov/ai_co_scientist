@@ -12,6 +12,18 @@ Shared Pydantic models and helper utilities used across all services
 
 ## Build / install locally
 ```bash
+# go to the common service root folder from the root of the repo
 cd services/common
-python -m build
-pip install dist/shared_library-0.1.0-py3-none-any.whl
+
+# get help
+make help
+
+# install all requirements (incl. tests)
+make install
+
+# run tests
+make test
+
+# build
+make build 
+```

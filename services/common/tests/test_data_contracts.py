@@ -1,5 +1,5 @@
 from datetime import datetime
-from shared_library import (
+from shared_library.data_contracts import (
     OCRRequest,
     OCRResponse,
     OCRSection,
