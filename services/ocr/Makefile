@@ -1,7 +1,7 @@
 # services/ocr/Makefile
 
 BASE_IMAGE ?= nvidia/cuda:12.8.1-cudnn-devel-ubuntu22.04
-IMAGE_TAG  ?= deepseek-ocr-cuda12-cu118:serve
+IMAGE_TAG  ?= deepseek-ocr-service
 
 CONTAINER_PORT ?= 8002
 HOST_PORT      ?= 8002
@@ -10,6 +10,9 @@ PYTHON ?= python
 APP_MODULE := src.server:app
 HOST := 0.0.0.0
 
+# repo root (two levels up from services/ocr)
+REPO_ROOT := $(abspath $(PWD)/../..)
+SERVICE_DIR := services/ocr
 
 
 .PHONY: help
@@ -43,10 +46,11 @@ run:
 
 .PHONY: docker-build
 docker-build:
+	cd $(REPO_ROOT) && \
 	docker build \
 	  --build-arg BASE_IMAGE="$(BASE_IMAGE)" \
 	  -t "$(IMAGE_TAG)" \
-	  .
+	  -f $(SERVICE_DIR)/Dockerfile .
 
 .PHONY: docker-run
 docker-run:

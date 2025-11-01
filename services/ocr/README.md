@@ -6,7 +6,7 @@ Running within a docker container to support a cuda:12.8.1 image and no vllm_cu1
 # export local env vars
 ```bash
 export BASE_IMAGE="nvidia/cuda:12.8.1-cudnn-devel-ubuntu22.04"
-export IMAGE_TAG="deepseek-ocr-cuda12-cu118:serve"
+export IMAGE_TAG="deepseek-ocr-service"
 ```
 
 # build
