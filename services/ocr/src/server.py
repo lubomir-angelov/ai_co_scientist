@@ -2,7 +2,8 @@
 import os
 import base64
 import tempfile
-from datetime import datetime
+from datetime import datetime, timezone
+from contextlib import asynccontextmanager
 
 # --- keep your flash-attn disables, do this BEFORE importing transformers ---
 os.environ["TRANSFORMERS_ATTENTION_IMPLEMENTATION"] = "eager"
@@ -10,13 +11,14 @@ os.environ["TRANSFORMERS_NO_FLASH_ATTENTION"] = "1"
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 from transformers import AutoModel, AutoTokenizer
 import torch
 from pdf2image import convert_from_path
 from PIL import Image
 
-from shared_library import (
+# run with make run to add the shared_library to PYTHONPATH
+# or export it manually before running uvicorn
+from shared_library.data_contracts import (
     OCRRequest,
     OCRResponse,
     OCRSection,
@@ -25,18 +27,9 @@ from shared_library import (
 
 MODEL_PATH = "/opt/models/deepseek-ocr"
 
-app = FastAPI(title="DeepSeek OCR Service", version="0.1.0")
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 # load once
-@app.on_event("startup")
-def load_model():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     global tokenizer, model
     print("Loading tokenizer...")
     tokenizer = AutoTokenizer.from_pretrained(
@@ -53,6 +46,17 @@ def load_model():
     )
     model = model.to(device="cuda", dtype=torch.bfloat16).eval()
     print("Model is on GPU and ready.")
+
+app = FastAPI(title="DeepSeek OCR Service", 
+              version="0.1.0",
+              lifespan=lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 def _bytes_to_image_path(data: bytes, filename_hint: str = "upload") -> str:
@@ -123,7 +127,7 @@ def extract(req: OCRRequest):
         sections=sections,
         tables=tables,
         metadata={
-            "processed_at": datetime.utcnow().isoformat() + "Z",
+            "processed_at": datetime.now(timezone.utc).isoformat(),
             "engine": "deepseek-ocr",
         },
     )

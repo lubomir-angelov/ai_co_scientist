@@ -4,50 +4,55 @@ from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 from src.server import app
+import src.server as server  # we'll patch globals on this
 
 
-class FakePipeline:
-    def process_bytes(self, data: bytes, doc_id: str):
-        return {
-            "sections": [{"name": "FullText", "text": "hello from fake ocr"}],
-            "tables": [],
-            "metadata": {"doc_id": doc_id},
-        }
+class FakeModel:
+    def infer(
+        self,
+        tokenizer,
+        prompt: str,
+        image_file: str,
+        output_path: str,
+        base_size: int,
+        image_size: int,
+        crop_mode: bool,
+        save_results: bool,
+        test_compress: bool,
+    ):
+        # mimic real DeepSeek-OCR return shape
+        return {"text": "hello from fake ocr"}
 
 
-def _fake_load_deepseek_ocr():
-    return FakePipeline()
+class FakeTokenizer:
+    pass
 
 
-@patch("src.server.load_model")  # prevent real startup load
-def test_ocr_endpoint_returns_200(mock_startup):
+@patch("src.server.lifespan")  # don't run real startup
+@patch("src.server._bytes_to_image_path", return_value="/tmp/fake.jpg")
+def test_ocr_endpoint_returns_200(_mock_path, _mock_load):
     client = TestClient(app)
 
-    # fake base64 image
+    # inject fake globals that the endpoint uses
+    server.model = FakeModel()
+    server.tokenizer = FakeTokenizer()
+
     content_b64 = base64.b64encode(b"fake-image").decode()
-
-    # manually inject fake pipeline (startup was patched)
-    app.dependency_overrides = {}
-    # server.py keeps global ocr_pipeline; set it:
-    import src.server as server  # noqa
-
-    server.ocr_pipeline = FakePipeline()
 
     resp = client.post(
         "/ocr/extract",
         json={"doc_id": "doc-123", "content_b64": content_b64},
     )
+
     assert resp.status_code == 200
     data = resp.json()
     assert data["doc_id"] == "doc-123"
-    assert len(data["sections"]) == 1
     assert data["sections"][0]["text"] == "hello from fake ocr"
 
 
-@patch("src.server.load_model")
-def test_ocr_endpoint_rejects_bad_base64(mock_startup):
+@patch("src.server.lifespan")
+def test_ocr_endpoint_rejects_bad_base64(_mock_load):
     client = TestClient(app)
-
     resp = client.post(
         "/ocr/extract",
         json={"doc_id": "doc-123", "content_b64": "!!not base64!!"},

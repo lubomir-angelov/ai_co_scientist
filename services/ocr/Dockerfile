@@ -28,7 +28,7 @@ RUN git clone https://github.com/deepseek-ai/DeepSeek-OCR.git
 WORKDIR /tmp/DeepSeek-OCR
 
 # server deps (fastapi, uvicorn, pdf2image, pillow, etc.)
-COPY requirements_server.txt /tmp/requirements_server.txt
+COPY requirements.txt /tmp/requirements_server.txt
 
 RUN ${VENV_PATH}/bin/python -m pip install --pre torch torchvision torchaudio \
       --index-url https://download.pytorch.org/whl/nightly/cu128 && \

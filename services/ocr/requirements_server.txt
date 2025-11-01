@@ -1,4 +1,0 @@
-fastapi==0.115.4
-uvicorn[standard]==0.32.0
-python-multipart==0.0.9
-pdf2image==1.17.0

@@ -10,8 +10,7 @@ PYTHON ?= python
 APP_MODULE := src.server:app
 HOST := 0.0.0.0
 
-# allow local imports during dev
-export PYTHONPATH := $(PWD)/src:$(PWD)/../common/src:$(PYTHONPATH)
+
 
 .PHONY: help
 help:
@@ -22,9 +21,14 @@ help:
 	@echo "make test           - run pytest"
 	@echo "make fmt            - run ruff format + ruff check"
 
+# add these at the top of the Makefile
+PWD := $(shell pwd)
+export PYTHONPATH := $(PWD)/src:$(PWD)/../common/src:$(PYTHONPATH)
+
 .PHONY: install
 install:
-	$(PYTHON) -m pip install -r requirements_server.txt
+	$(PYTHON) -m pip install -r requirements.txt
+	[ -f requirements_test.txt ] && $(PYTHON) -m pip install -r requirements_test.txt || true
 	@if [ -d "../common" ]; then \
 	  cd ../common && $(PYTHON) -m pip install -e . ; \
 	fi
