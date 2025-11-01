@@ -11,4 +11,4 @@ easydict
 addict 
 Pillow
 numpy
-torch==2.2.0+cu128
+torch
