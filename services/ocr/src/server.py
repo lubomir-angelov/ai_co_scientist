@@ -1,120 +1,104 @@
+# services/ocr/src/server.py
 import os
+import base64
 import tempfile
-import torch
-from fastapi import FastAPI, UploadFile, File
-from fastapi.responses import JSONResponse, HTMLResponse
-from transformers import AutoModel, AutoTokenizer
+from datetime import datetime
 
-from pdf2image import convert_from_path
-from PIL import Image
-import mimetypes
-
-
-# --- Force Transformers to NOT auto-enable FlashAttention ---
-# This prevents the internal _autoset_attn_implementation() call
-# from trying flash-attn and throwing ImportError.
+# --- keep your flash-attn disables, do this BEFORE importing transformers ---
 os.environ["TRANSFORMERS_ATTENTION_IMPLEMENTATION"] = "eager"
-# fallback belt + suspenders for some builds:
 os.environ["TRANSFORMERS_NO_FLASH_ATTENTION"] = "1"
 
-MODEL_PATH = "/opt/models/deepseek-ocr"  # baked into the image during build
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from transformers import AutoModel, AutoTokenizer
+import torch
+from pdf2image import convert_from_path
+from PIL import Image
 
-print("Loading tokenizer...")
-tokenizer = AutoTokenizer.from_pretrained(
-    MODEL_PATH,
-    trust_remote_code=True,
+from shared_library import (
+    OCRRequest,
+    OCRResponse,
+    OCRSection,
+    OCRTable,
 )
 
-print("Loading model on GPU (no flash-attn)...")
-model = AutoModel.from_pretrained(
-    MODEL_PATH,
-    trust_remote_code=True,
-    use_safetensors=True,
+MODEL_PATH = "/opt/models/deepseek-ocr"
 
-    # critical: tell HF "do NOT try flash-attn kernels"
-    _attn_implementation="eager",
+app = FastAPI(title="DeepSeek OCR Service", version="0.1.0")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
-# move model to RTX 5090 in BF16
-model = model.to(device="cuda", dtype=torch.bfloat16).eval()
-print("Model is on GPU and ready.")
+# load once
+@app.on_event("startup")
+def load_model():
+    global tokenizer, model
+    print("Loading tokenizer...")
+    tokenizer = AutoTokenizer.from_pretrained(
+        MODEL_PATH,
+        trust_remote_code=True,
+    )
 
-app = FastAPI()
+    print("Loading model on GPU (eager attention, no flash-attn)...")
+    model = AutoModel.from_pretrained(
+        MODEL_PATH,
+        trust_remote_code=True,
+        use_safetensors=True,
+        _attn_implementation="eager",
+    )
+    model = model.to(device="cuda", dtype=torch.bfloat16).eval()
+    print("Model is on GPU and ready.")
 
-HTML_PAGE = """
-<!DOCTYPE html>
-<html>
-  <body style="font-family:sans-serif; max-width:600px; margin:2rem auto;">
-    <h2>DeepSeek OCR Demo (RTX 5090 GPU, eager attention)</h2>
-    <form id="f">
-      <input type="file" name="image" accept="image/*,application/pdf"/>
-      <button type="submit">OCR</button>
-    </form>
-    <pre id="out" style="white-space:pre-wrap; background:#eee; padding:1rem; margin-top:1rem;"></pre>
-    <script>
-    const f = document.getElementById('f');
-    const out = document.getElementById('out');
-    f.onsubmit = async (e) => {
-      e.preventDefault();
-      const data = new FormData(f);
-      out.textContent = "Running OCR...";
-      const res = await fetch('/ocr', { method:'POST', body:data });
-      const j = await res.json();
-      out.textContent = j.text || j.error || "No result";
-    };
-    </script>
-  </body>
-</html>
-"""
 
-@app.get("/", response_class=HTMLResponse)
-async def index():
-    return HTML_PAGE
+def _bytes_to_image_path(data: bytes, filename_hint: str = "upload") -> str:
+    # if it's a PDF, rasterize first page
+    if filename_hint.lower().endswith(".pdf"):
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_pdf:
+            tmp_pdf.write(data)
+            pdf_path = tmp_pdf.name
 
-@app.post("/ocr")
-async def ocr(image: UploadFile = File(...)):
+        pages = convert_from_path(pdf_path, dpi=300)
+        if not pages:
+            raise HTTPException(status_code=400, detail="PDF had no pages")
+        page0: Image.Image = pages[0]
+        raster_tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".jpg")
+        page0.save(raster_tmp.name, format="JPEG", quality=95)
+        return raster_tmp.name
+
+    # else: assume image
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".bin") as tmp_img:
+        tmp_img.write(data)
+        img_path = tmp_img.name
+
+    # verify it’s actually an image (Pillow will throw if not)
+    Image.open(img_path)
+    return img_path
+
+
+@app.post("/ocr/extract", response_model=OCRResponse)
+def extract(req: OCRRequest):
+    # decode base64
     try:
-        # Save upload to a temp file
-        with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(image.filename or "")[-1]) as tmp:
-            file_bytes = await image.read()
-            tmp.write(file_bytes)
-            tmp_path = tmp.name
+        content_bytes = base64.b64decode(req.content_b64)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid base64: {e}")
 
-        # Decide what to feed into model.infer
-        # Case 1: PDF -> render first page to a temp JPG
-        is_pdf = (image.content_type == "application/pdf") or (
-            (image.filename or "").lower().endswith(".pdf")
-        )
+    # pick suitable image path (pdf→jpg)
+    image_path = _bytes_to_image_path(content_bytes, filename_hint=f"{req.doc_id}.pdf")
 
-        if is_pdf:
-            pages = convert_from_path(tmp_path, dpi=300)
-            if not pages:
-                return JSONResponse({"error": "PDF had no pages"}, status_code=400)
-            page0: Image.Image = pages[0]
+    prompt = "<image>\n<|grounding|>Convert the document to markdown."
+    out_dir = tempfile.mkdtemp()
 
-            # Write that first page back out as a temp jpeg
-            raster_tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".jpg")
-            page0.save(raster_tmp.name, format="JPEG", quality=95)
-            image_path_for_infer = raster_tmp.name
-        else:
-            # Not a PDF: assume it's a normal image Pillow can open
-            # Let's sanity check that it's actually an image
-            try:
-                _ = Image.open(tmp_path)
-                image_path_for_infer = tmp_path
-            except Exception:
-                return JSONResponse(
-                    {"error": "Uploaded file is not a supported image/PDF"},
-                    status_code=400,
-                )
-
-        prompt = "<image>\n<|grounding|>Convert the document to markdown."
-        out_dir = tempfile.mkdtemp()
-
+    try:
         res = model.infer(
             tokenizer,
             prompt=prompt,
-            image_file=image_path_for_infer,
+            image_file=image_path,
             output_path=out_dir,
             base_size=1024,
             image_size=640,
@@ -122,13 +106,24 @@ async def ocr(image: UploadFile = File(...)):
             save_results=True,
             test_compress=True,
         )
-
-        if isinstance(res, dict):
-            text_out = res.get("text", "") or ""
-        else:
-            text_out = "OK, processed."
-
-        return JSONResponse({"text": text_out})
-
     except Exception as e:
-        return JSONResponse({"error": str(e)}, status_code=500)
+        raise HTTPException(status_code=500, detail=f"OCR failed: {e}")
+
+    if isinstance(res, dict):
+        text_out = res.get("text", "") or ""
+    else:
+        text_out = "OK, processed."
+
+    # we don’t have real sections/tables parsed yet, so return 1 blob section
+    sections = [OCRSection(name="FullText", text=text_out)]
+    tables: list[OCRTable] = []
+
+    return OCRResponse(
+        doc_id=req.doc_id,
+        sections=sections,
+        tables=tables,
+        metadata={
+            "processed_at": datetime.utcnow().isoformat() + "Z",
+            "engine": "deepseek-ocr",
+        },
+    )
