@@ -90,7 +90,7 @@ def _bytes_to_image_path(data: bytes, filename_hint: str = "upload") -> str:
 
     # verify it’s actually an image (Pillow will throw if not)
     Image.open(img_path)
-    
+
     return img_path
 
 
@@ -120,6 +120,7 @@ def extract(req: OCRRequest):
             save_results=True,
             test_compress=True,
         )
+        
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"OCR failed: {e}")
 
