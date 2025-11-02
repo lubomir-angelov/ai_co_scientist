@@ -73,11 +73,14 @@ def _bytes_to_image_path(data: bytes, filename_hint: str = "upload") -> str:
             pdf_path = tmp_pdf.name
 
         pages = convert_from_path(pdf_path, dpi=300)
+
         if not pages:
             raise HTTPException(status_code=400, detail="PDF had no pages")
+        
         page0: Image.Image = pages[0]
         raster_tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".jpg")
         page0.save(raster_tmp.name, format="JPEG", quality=95)
+
         return raster_tmp.name
 
     # else: assume image
@@ -87,6 +90,7 @@ def _bytes_to_image_path(data: bytes, filename_hint: str = "upload") -> str:
 
     # verify it’s actually an image (Pillow will throw if not)
     Image.open(img_path)
+    
     return img_path
 
 
