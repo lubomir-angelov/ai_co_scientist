@@ -47,6 +47,12 @@ async def lifespan(app: FastAPI):
     model = model.to(device="cuda", dtype=torch.bfloat16).eval()
     print("Model is on GPU and ready.")
 
+    try:
+        yield
+    finally:
+        # optional cleanup
+        pass
+
 app = FastAPI(title="DeepSeek OCR Service", 
               version="0.1.0",
               lifespan=lifespan)
