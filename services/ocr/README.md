@@ -15,6 +15,7 @@ docker build \
   --build-arg BASE_IMAGE="${BASE_IMAGE}" \
   -t "${IMAGE_TAG}" .
 ```
+
 # run
 ```bash
 docker run -it --rm --gpus all \
