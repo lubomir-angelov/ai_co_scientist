@@ -83,3 +83,88 @@ invalid_at = if later contradicted or superseded
 episodes = which ingest/summary/note created this edge
 fact = natural language statement (Graphiti’s fact field)
 ```
+
+# 2. Domain-specific episode write: “paper ingest” + “note”
+
+We’ll define shared models around papers, then implement them with Graphiti+FalkorDB.
+
+## 2.1 Shared models (go in shared_library)
+- PaperMeta
+- PaperSectionEpisodeIn
+- PaperNoteEpisodein
+- ConceptQuery
+- MemoryFact
+- GenericInterface
+# 3. Graphiti + FalkorDB implementation (stays in memory_service)
+## 3.1 Graphiti client (Falkor backend)
+## 3.2 Paper memory backend: adding sections & notes
+# 4. Graphiti queries for concept / topic retrieval
+
+Now the key part: “What do we know about X?”
+
+## 4.1 Search all facts about a concept / topic
+
+Example user queries:
+
+- “microring resonator thermal tuning”
+- “integrated quantum photonics with time-bin encoding”
+- “optical neural networks using phase-change materials”
+
+We’ll use Graphiti’s hybrid search() over the graph; each result is an EntityEdge (a fact).
+Use cases:
+
+```
+“Summarise what we know about microring resonators for ONNs”:
+ConceptQuery(query_text="microring resonator optical neural network")
+
+“As of 2023-01-01, what were the reported best energy/bit for PCM photonics?”:
+time_filter_as_of=datetime(2023,1,1, tzinfo=UTC)
+```
+
+The planner can then synthesize these MemoryFacts into a structured answer.
+
+# 5. Where to put what (re-answering your question)
+
+Keep the split like this:
+
+## In shared_library (reusable, no dependency on Graphiti/Falkor)
+
+### Pydantic models:
+
+```
+PaperMeta, PaperSectionEpisodeIn, PaperNoteEpisodeIn
+ConceptQuery, MemoryFact
+```
+
+### Abstract interface:
+```
+PaperMemoryBackend (add_paper_section, add_paper_note, search_concepts)
+```
+
+### The MemoryTool card definition (the function schema the LLM sees) that wraps PaperMemoryBackend.
+
+So all other services (reader, planner, explainer) just see:
+```
+backend: PaperMemoryBackend
+await backend.add_paper_section(...)
+await backend.search_concepts(...)
+``` 
+
+## In memory_service (implementation details, Graphiti/Falkor-specific)
+### GraphitiClient configuration:
+
+Falkor URI, graph name, provider config
+
+### GraphitiPaperMemoryBackend that:
+```
+calls Graphiti.add_episode() for sections & notes
+calls Graphiti.search() to implement search_concepts
+```
+
+Any low-level search recipes, Cypher, recipes you use later.
+
+## Why structure it this way?
+
+If in 6 months we decide “I want Zep Cloud instead of self-hosted Graphiti”, you only rewrite the PaperMemoryBackend implementation inside memory_service.
+
+The rest of the co-scientist (reader agents, planner, UI) keep working unchanged, since they depend only on the shared_library types.
