@@ -2,7 +2,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 from typing import Any, Dict, List, Optional
 
-from ..graph_client import get_graphiti
+from ..graphiti_client import get_graphiti
 
 router = APIRouter(tags=["queries"])
 
