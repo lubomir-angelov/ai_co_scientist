@@ -1,0 +1,88 @@
+version: "3.9"
+
+name: ai-co-scientist
+
+services:
+  # LLM Service - OpenAI-compatible LLM inference with vLLM
+  llm:
+    image: vllm/vllm-openai:latest
+    command: >
+      --model ${LLM_MODEL:-deepseek-ai/DeepSeek-R1-Distill-Qwen-14B}
+      --max-model-len 32768
+      --gpu-memory-utilization 0.90
+      --trust-remote-code
+      --port 8000
+    environment:
+      VLLM_LOGGING_LEVEL: INFO
+    ports:
+      - "8000:8000"     # raw vLLM API
+    gpus: all
+    healthcheck:
+      test: ["CMD", "bash", "-lc", "curl -sf http://localhost:8000/v1/models > /dev/null"]
+      interval: 30s
+      timeout: 5s
+      retries: 20
+      start_period: 60s
+
+  # LLM Gateway - OpenAI-compatible proxy with authentication
+  llm-gateway:
+    build: ./services/llm/src/gateway
+    environment:
+      UPSTREAM_BASE_URL: http://llm:8000/v1
+      API_KEY: ${LLM_API_KEY:-local-llm}
+    ports:
+      - "9000:8000"     # public OpenAI-compatible entrypoint
+    depends_on:
+      llm:
+        condition: service_healthy
+
+  # OCR Service - DeepSeek OCR for document/image understanding
+  ocr:
+    build:
+      context: .
+      dockerfile: ./services/ocr/Dockerfile
+      args:
+        BASE_IMAGE: nvidia/cuda:12.8.1-cudnn-devel-ubuntu22.04
+        SERVICES_DIR: services
+        SERVICE_NAME: ocr
+    environment:
+      CUDA_VISIBLE_DEVICES: "1"
+      HF_HOME: /workspace/hf-cache
+      TRANSFORMERS_ATTENTION_IMPLEMENTATION: eager
+      TRANSFORMERS_NO_FLASH_ATTENTION: "1"
+    ports:
+      - "8002:8002"     # OCR extraction endpoint
+    gpus:
+      - device: 1
+    depends_on:
+      llm-gateway:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8002/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 10
+      start_period: 120s
+
+  # Orchestrator - Agent loop that coordinates between services
+  orchestrator:
+    build:
+      context: .
+      dockerfile: ./services/orchestrator/Dockerfile
+    environment:
+      LLM_BASE_URL: http://llm-gateway:8000/v1
+      LLM_API_KEY: ${LLM_API_KEY:-local-llm}
+      OCR_BASE_URL: http://ocr:8002
+    ports:
+      - "8001:8000"
+    depends_on:
+      llm-gateway:
+        condition: service_started
+      ocr:
+        condition: service_healthy
+
+  # NOTE: Memory service (graph store) is not included yet - implementation pending
+
+networks:
+  default:
+    name: ai-co-scientist-network
