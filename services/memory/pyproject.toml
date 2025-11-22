@@ -1,0 +1,11 @@
+[project]
+name = "octo-memory-service"
+version = "0.1.0"
+dependencies = [
+  "fastapi",
+  "uvicorn[standard]",
+  "pydantic",
+  "pydantic-settings",
+  "graphiti-core",     # from pip/uv as in docs
+  "httpx",             # if you ever need to call other services
+]
