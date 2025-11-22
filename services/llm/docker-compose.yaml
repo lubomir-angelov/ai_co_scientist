@@ -1,0 +1,34 @@
+version: "3.9"
+
+name: ai-co-llm            # compose project name -> network will be ai-co-llm_default
+services:
+  llm:
+    image: vllm/vllm-openai:latest
+    command: >
+      --model ${LLM_MODEL:-deepseek-ai/DeepSeek-R1-Distill-Qwen-14B}
+      --max-model-len 32768
+      --gpu-memory-utilization 0.90
+      --trust-remote-code
+      --port 8000
+    environment:
+      VLLM_LOGGING_LEVEL: INFO
+    ports:
+      - "8000:8000"     # optional: expose raw vLLM for debugging
+    gpus: all           # compose v2 GPU flag
+    healthcheck:
+      test: ["CMD", "bash", "-lc", "curl -sf http://localhost:8000/v1/models > /dev/null"]
+      interval: 30s
+      timeout: 5s
+      retries: 20
+      start_period: 60s
+
+  llm-gateway:
+    build: ./src/gateway
+    environment:
+      UPSTREAM_BASE_URL: http://llm:8000/v1
+      API_KEY: ${LLM_API_KEY:-local-llm}
+    ports:
+      - "9000:8000"     # public OpenAI-compatible entrypoint
+    depends_on:
+      llm:
+        condition: service_healthy
