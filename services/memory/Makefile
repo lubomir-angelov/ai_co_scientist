@@ -9,7 +9,7 @@ CONTAINER_PORT ?= 8005
 HOST_PORT      ?= 8005
 
 PYTHON    ?= python
-APP_MODULE := memory_service.app:app
+APP_MODULE := src.app:app
 HOST      := 0.0.0.0
 
 # FalkorDB config for local dev

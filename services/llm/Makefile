@@ -3,7 +3,7 @@
 
 SHELL := /bin/bash
 COMPOSE := docker compose
-COMPOSE_FILE := docker-compose.yml
+COMPOSE_FILE := docker-compose.yaml
 PROJECT := ai-co-llm
 
 # Defaults (can be overridden via environment or .env)
