@@ -1,6 +1,6 @@
-  fastapi
-  uvicorn[standard]
-  pydantic
-  pydantic-settings
-  graphiti-core
-  httpx
+  fastapi==0.122.0
+  uvicorn[standard]==0.38.0
+  pydantic==2.12.4
+  pydantic-settings==2.12.0
+  graphiti-core==0.24.1
+  httpx==0.28.1

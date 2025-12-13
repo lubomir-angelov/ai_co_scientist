@@ -1,11 +1,11 @@
-# shared_library/memory/interface.py
+# shared_library/memory_interface.py
 
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from typing import List
 
-from .papers import (
+from .data_contracts import (
     PaperSectionEpisodeIn,
     PaperNoteEpisodeIn,
     ConceptQuery,
@@ -18,8 +18,8 @@ class PaperMemoryBackend(ABC):
     Abstract interface for the co-scientist's long-term paper memory.
 
     - Lives in shared_library so that *all* microservices can depend on it
-      without knowing about the underlying backend (Graphiti, Zep, pgvector, etc.).
-    - The memory microservice provides a concrete implementation of this interface.
+      without knowing about the underlying backend (Graphiti, Zep, etc.).
+    - The memory microservice provides a concrete implementation.
     """
 
     async def init(self) -> None:
@@ -38,7 +38,7 @@ class PaperMemoryBackend(ABC):
         """
         return None
 
-    # --- Episode ingestion methods ---
+    # ----------------- ingestion -----------------
 
     @abstractmethod
     async def add_paper_section(self, ep: PaperSectionEpisodeIn) -> str:
@@ -46,7 +46,7 @@ class PaperMemoryBackend(ABC):
         Ingest a chunk of a paper section into memory.
 
         Returns:
-            A backend-specific episode identifier (string).
+            Backend-specific episode identifier.
         """
         raise NotImplementedError
 
@@ -56,11 +56,11 @@ class PaperMemoryBackend(ABC):
         Ingest a user-authored note/comment on a paper.
 
         Returns:
-            A backend-specific episode identifier (string).
+            Backend-specific episode identifier.
         """
         raise NotImplementedError
 
-    # --- Retrieval methods ---
+    # ----------------- retrieval -----------------
 
     @abstractmethod
     async def search_concepts(self, q: ConceptQuery) -> List[MemoryFact]:
@@ -71,11 +71,5 @@ class PaperMemoryBackend(ABC):
           - Use both semantic and graph-based signals where possible.
           - Respect q.time_filter_as_of if provided (temporal 'as-of' queries).
           - Return up to q.limit results, sorted by recency/relevance.
-
-        Args:
-            q: ConceptQuery describing the topic and temporal constraints.
-
-        Returns:
-            A list of MemoryFact objects.
         """
         raise NotImplementedError

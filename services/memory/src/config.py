@@ -1,15 +1,23 @@
+# memory_service/config.py
+
+from __future__ import annotations
+
 from pydantic_settings import BaseSettings
 
-class Settings(BaseSettings):
-    graph_backend: str = "falkordb"  # or "neo4j", "kuzu", "neptune"
-    falkor_host: str = "localhost"
-    falkor_port: int = 6379
 
-    # LLM / embeddings – Graphiti expects OpenAI-compatible provider
-    openai_api_key: str
+class Settings(BaseSettings):
+    # FalkorDB / Graphiti
+    graphiti_uri: str = "falkor://falkordb:6379"
+    graph_name: str = "photonic_memory"
+    llm_provider: str = "openai"
+    embedding_provider: str = "openai"
+
+    # If Graphiti needs direct OpenAI config, you can pass via env
+    openai_api_key: str | None = None
     openai_base_url: str | None = None
 
     class Config:
         env_prefix = "MEMORY_"
+
 
 settings = Settings()

@@ -1,4 +1,4 @@
-# memory_service/backends/graphiti_paper_backend.py
+# memory_service/graphiti_paper_backend.py
 
 from __future__ import annotations
 
@@ -9,22 +9,19 @@ from typing import List
 from graphiti_core.nodes import EpisodeType
 from graphiti_core.edges import EntityEdge
 
-from shared_library.memory.interface import PaperMemoryBackend
-from shared_library.memory.papers import (
+from shared_library.memory_interface import PaperMemoryBackend
+from shared_library.data_contracts import (
     PaperSectionEpisodeIn,
     PaperNoteEpisodeIn,
     ConceptQuery,
     MemoryFact,
 )
-from graphiti_client import GraphitiClient
+from .graphiti_client import GraphitiClient
 
 
 class GraphitiPaperMemoryBackend(PaperMemoryBackend):
     """
-    Graphiti/FalkorDB-backed implementation of the PaperMemoryBackend.
-
-    This class is *internal* to the memory_service and should not leak into
-    other microservices. They should depend on PaperMemoryBackend instead.
+    Graphiti/FalkorDB-backed implementation of PaperMemoryBackend.
     """
 
     def __init__(self, client: GraphitiClient) -> None:
@@ -36,19 +33,9 @@ class GraphitiPaperMemoryBackend(PaperMemoryBackend):
     async def close(self) -> None:
         await self._client.close()
 
-    # ------------------------------------------------------------------
-    # Episode ingestion
-    # ------------------------------------------------------------------
+    # ---------------- ingestion ----------------
 
     async def add_paper_section(self, ep: PaperSectionEpisodeIn) -> str:
-        """
-        Ingest a chunk of a paper section as a JSON episode.
-
-        Graphiti will:
-          - create/resolve a 'paper' entity,
-          - link it to 'concept' entities and others,
-          - create temporal fact edges like PAPER_MENTIONS_CONCEPT, etc.
-        """
         g = self._client.client
 
         body = {
@@ -61,7 +48,6 @@ class GraphitiPaperMemoryBackend(PaperMemoryBackend):
         }
 
         created_at = ep.created_at or datetime.now(timezone.utc)
-        # Use published_at as the 'world-time' when this knowledge became true, if known
         reference_time = ep.paper.published_at or created_at
 
         episode = await g.add_episode(
@@ -75,12 +61,6 @@ class GraphitiPaperMemoryBackend(PaperMemoryBackend):
         return str(episode.uuid)
 
     async def add_paper_note(self, ep: PaperNoteEpisodeIn) -> str:
-        """
-        Ingest a user-authored note/comment as an episode.
-
-        Graphiti will link the note to the paper and to any concepts/entities
-        it detects in the note text.
-        """
         g = self._client.client
 
         body = {
@@ -103,22 +83,11 @@ class GraphitiPaperMemoryBackend(PaperMemoryBackend):
 
         return str(episode.uuid)
 
-    # ------------------------------------------------------------------
-    # Retrieval
-    # ------------------------------------------------------------------
+    # ---------------- retrieval ----------------
 
     async def search_concepts(self, q: ConceptQuery) -> List[MemoryFact]:
-        """
-        Retrieve facts relevant to a concept/topic across all ingested papers.
-
-        Implementation strategy:
-          - Use Graphiti's hybrid search over the knowledge graph.
-          - Let Graphiti/LLM interpret the natural-language query.
-          - Respect q.time_filter_as_of for temporal 'as-of' queries.
-        """
         g = self._client.client
 
-        # You can enrich the query text a bit to hint at the structure you want.
         nl_query = (
             "Retrieve key facts, claims, results, and notes related to the topic: "
             f"'{q.query_text}'. "
@@ -127,17 +96,14 @@ class GraphitiPaperMemoryBackend(PaperMemoryBackend):
             "optical processing, and quantum photonics where relevant."
         )
 
-        # Graphiti's search returns EntityEdge objects (facts)
         edges: List[EntityEdge] = await g.search(
             query=nl_query,
             num_results=q.limit,
-            reference_time=q.time_filter_as_of,  # temporal slice if provided
+            reference_time=q.time_filter_as_of,
         )
 
         facts: List[MemoryFact] = []
-
         for e in edges:
-            # We defensively use getattr in case some fields are missing depending on version
             facts.append(
                 MemoryFact(
                     fact=getattr(e, "fact", ""),
@@ -156,5 +122,4 @@ class GraphitiPaperMemoryBackend(PaperMemoryBackend):
                     or None,
                 )
             )
-
         return facts

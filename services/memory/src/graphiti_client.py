@@ -1,23 +1,29 @@
 # memory_service/graphiti_client.py
+
+from __future__ import annotations
+
 from graphiti_core import Graphiti
 
-class GraphitiClient:
-    def __init__(
-        self,
-        uri: str = "falkor://localhost:6379",
-        graph_name: str = "photonic_memory",
-        llm_provider: str = "openai",
-        embedding_provider: str = "openai",
-    ):
-        self._graphiti = Graphiti(
-            uri=uri,
-            graph_name=graph_name,
-            llm_provider=llm_provider,
-            embedding_provider=embedding_provider,
-        )
-        self._initialized = False
+from .config import settings
 
-    async def init(self):
+
+class GraphitiClient:
+    """
+    Thin wrapper around Graphiti for the memory service.
+    """
+
+    def __init__(self) -> None:
+        self._graphiti = Graphiti(
+            uri=settings.graphiti_uri,
+            graph_name=settings.graph_name,
+            llm_provider=settings.llm_provider,
+            embedding_provider=settings.embedding_provider,
+            # If needed, Graphiti can read API keys from env or you can
+            # pass settings.openai_api_key / base_url into provider config.
+        )
+        self._initialized: bool = False
+
+    async def init(self) -> None:
         if not self._initialized:
             await self._graphiti.build_indices_and_constraints()
             self._initialized = True
@@ -26,5 +32,5 @@ class GraphitiClient:
     def client(self) -> Graphiti:
         return self._graphiti
 
-    async def close(self):
+    async def close(self) -> None:
         await self._graphiti.close()
