@@ -78,3 +78,26 @@ sudo service docker restart || true
 # check the container can see the local cuda
 docker run --rm --gpus all nvidia/cuda:12.1.0-base-ubuntu22.04 nvidia-smi
 ```
+
+
+## Git empty objects
+```bash
+# 1) Remove the specific corrupt object Git reports
+
+# Run in the failing repo (ai_co_scientist.clean):
+
+cd ~/repos/ai_co_scientist.clean
+
+rm -f .git/objects/38/63f9095bf20e86d80f63d655ea2b6433d566b6
+
+
+# Then:
+
+git fetch --all --prune
+
+
+# If it succeeds, finish with:
+
+git fsck --full
+git gc --prune=now
+```
