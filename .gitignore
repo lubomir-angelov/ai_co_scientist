@@ -185,7 +185,7 @@ examples/notebooks/local_model/*
 
 
 # local data artifacts
-**/models
+#**/models
 **/data
 **/local
 **/resources
