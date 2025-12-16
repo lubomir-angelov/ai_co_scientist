@@ -1,16 +1,7 @@
-"""
-Memory - adapted from octotools
-Tracks queries, files, and actions throughout agent execution
-"""
-
 from typing import Dict, Any, List, Union, Optional
 import os
 
-
 class Memory:
-    """
-    Memory system for tracking agent state and history
-    """
 
     def __init__(self):
         self.query: Optional[str] = None
@@ -19,13 +10,11 @@ class Memory:
         self._init_file_types()
 
     def set_query(self, query: str) -> None:
-        """Set the main query"""
         if not isinstance(query, str):
             raise TypeError("Query must be a string")
         self.query = query
 
     def _init_file_types(self):
-        """Initialize file type mappings"""
         self.file_types = {
             'image': ['.jpg', '.jpeg', '.png', '.gif', '.bmp'],
             'text': ['.txt', '.md'],
@@ -46,7 +35,6 @@ class Memory:
         }
 
     def _get_default_description(self, file_name: str) -> str:
-        """Get default description based on file extension"""
         _, ext = os.path.splitext(file_name)
         ext = ext.lower()
 
@@ -56,12 +44,7 @@ class Memory:
 
         return f"A file with {ext[1:]} extension, provided as context for the query"
     
-    def add_file(
-        self,
-        file_name: Union[str, List[str]],
-        description: Union[str, List[str], None] = None
-    ) -> None:
-        """Add file(s) to memory with optional description"""
+    def add_file(self, file_name: Union[str, List[str]], description: Union[str, List[str], None] = None) -> None:
         if isinstance(file_name, str):
             file_name = [file_name]
         
@@ -79,15 +62,7 @@ class Memory:
                 'description': desc
             })
 
-    def add_action(
-        self,
-        step_count: int,
-        tool_name: str,
-        sub_goal: str,
-        command: str,
-        result: Any
-    ) -> None:
-        """Record an executed action in memory"""
+    def add_action(self, step_count: int, tool_name: str, sub_goal: str, command: str, result: Any) -> None:
         action = {
             'tool_name': tool_name,
             'sub_goal': sub_goal,
@@ -98,24 +73,11 @@ class Memory:
         self.actions[step_name] = action
 
     def get_query(self) -> Optional[str]:
-        """Get the current query"""
         return self.query
 
     def get_files(self) -> List[Dict[str, str]]:
-        """Get all files in memory"""
         return self.files
     
     def get_actions(self) -> Dict[str, Dict[str, Any]]:
-        """Get all recorded actions"""
         return self.actions
     
-    def get_action_summary(self) -> str:
-        """Get formatted summary of all actions"""
-        if not self.actions:
-            return "No actions recorded yet."
-        
-        summary = "\n".join([
-            f"{step}: Tool={action['tool_name']}, Goal={action['sub_goal']}"
-            for step, action in self.actions.items()
-        ])
-        return summary
