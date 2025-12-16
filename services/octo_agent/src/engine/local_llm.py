@@ -6,16 +6,9 @@ Adapted from octotools engine pattern
 import sys
 from pathlib import Path
 from typing import Any, Union, Optional
-
 import httpx
 
-# Add vendor to path
-repo_root = Path(__file__).resolve().parent.parent.parent.parent.parent.parent
-vendor_path = repo_root / "vendor" / "octotools"
-if str(vendor_path) not in sys.path:
-    sys.path.insert(0, str(vendor_path))
-
-from octotools.engine.base import EngineLM, CachedEngine
+from .base import EngineLM, CachedEngine
 
 
 class ChatLocalLLM(EngineLM, CachedEngine):
