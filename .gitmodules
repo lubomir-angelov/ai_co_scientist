@@ -1,3 +1,0 @@
-[submodule "vendor/octotools"]
-	path = vendor/octotools
-	url = https://github.com/octotools/octotools.git
