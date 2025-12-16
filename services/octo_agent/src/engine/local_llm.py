@@ -3,13 +3,10 @@ Local LLM Engine Adapter - communicates with LLM Gateway service
 Adapted from octotools engine pattern
 """
 
-import sys
-from pathlib import Path
-from typing import Any, Union, Optional
+from typing import Union, Optional
 import httpx
 
 from .base import EngineLM, CachedEngine
-
 
 class ChatLocalLLM(EngineLM, CachedEngine):
     """
