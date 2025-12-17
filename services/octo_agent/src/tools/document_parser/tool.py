@@ -1,5 +1,6 @@
 """
-DeepSeek OCR Server Client Tool (OctoTools)
+Document Parser Tool:
+ - Usees DeepSeek OCR Server Client to parse documents (PDF/images).
 
 Calls a local/remote FastAPI OCR server:
   POST {base_url}/ocr/extract
@@ -7,14 +8,6 @@ with payload:
   {"doc_id": "...", "content_b64": "..."}
 
 Returns a structured dict and (optionally) writes artifacts to output_dir.
-
-Notes / limitation:
-- Your current OCR server code always calls:
-    _bytes_to_image_path(..., filename_hint=f"{req.doc_id}.pdf")
-  which forces the PDF branch even for images. If you send image bytes, the server
-  may fail trying to rasterize a non-PDF as PDF.
-  Recommended server fix:
-    image_path = _bytes_to_image_path(content_bytes, filename_hint=req.doc_id)
 """
 
 from __future__ import annotations
@@ -43,7 +36,7 @@ class _ToolConfig:
     auth_header: Optional[str]
 
 
-class DeepSeek_OCR_Server_Tool(BaseTool):
+class Document_Parser_OCR_Tool(BaseTool):
     """
     OctoTools tool that sends a document (PDF/image) to the user's OCR server and returns OCR results.
     """
@@ -52,7 +45,7 @@ class DeepSeek_OCR_Server_Tool(BaseTool):
 
     def __init__(self) -> None:
         super().__init__(
-            tool_name="DeepSeek_OCR_Server_Tool",
+            tool_name="Document_Parser_OCR_Tool",
             tool_description=(
                 "Client tool for a FastAPI DeepSeek OCR server. "
                 "Accepts a local file path or URL (PDF/image), base64-encodes the bytes, "
@@ -75,7 +68,7 @@ class DeepSeek_OCR_Server_Tool(BaseTool):
             demo_commands=[
                 {
                     "command": (
-                        "tool = DeepSeek_OCR_Server_Tool(); "
+                        "tool = Document_Parser_OCR_Tool(); "
                         "tool.set_custom_output_dir('ocr_outputs'); "
                         "tool.execute(input_path_or_url='docs/sample.pdf')"
                     ),
@@ -83,7 +76,7 @@ class DeepSeek_OCR_Server_Tool(BaseTool):
                 },
                 {
                     "command": (
-                        "tool = DeepSeek_OCR_Server_Tool(); "
+                        "tool = Document_Parser_OCR_Tool(); "
                         "tool.execute(input_path_or_url='https://example.com/file.png', save_artifacts=False)"
                     ),
                     "description": "Run OCR on an image URL without saving artifacts.",
@@ -227,7 +220,7 @@ if __name__ == "__main__":
     # Minimal manual test:
     #   python tool.py
     #   (expects OCR server at http://localhost:8002)
-    tool = DeepSeek_OCR_Server_Tool()
+    tool = Document_Parser_OCR_Tool()
     tool.set_custom_output_dir("detected_ocr")
 
     # Change this to a real file in your environment.
