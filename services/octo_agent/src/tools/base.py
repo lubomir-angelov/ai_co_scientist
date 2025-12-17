@@ -1,6 +1,6 @@
 # octotools/tools/base.py
 
-from octotools.engine.openai import ChatOpenAI
+from ..engine.local_llm import ChatLocalLLM
 
 class BaseTool:
     """
