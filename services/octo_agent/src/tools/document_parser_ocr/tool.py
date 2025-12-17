@@ -224,7 +224,7 @@ if __name__ == "__main__":
     tool.set_custom_output_dir("detected_ocr")
 
     # Change this to a real file in your environment.
-    sample = os.environ.get("OCR_SAMPLE_INPUT", "examples/sample.pdf")
+    sample = os.environ.get("OCR_SAMPLE_INPUT", "examples/quantum_photonics_qems_mems.pdf")
 
     try:
         result = tool.execute(input_path_or_url=sample, save_artifacts=True)
