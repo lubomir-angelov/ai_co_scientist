@@ -185,7 +185,7 @@ def _infer_one_page(image_path: str, out_dir: str) -> str:
     os.makedirs(out_dir, exist_ok=True)
 
     prompt = "<image>\n<|grounding|>Convert the document to markdown."
-    _ = model.infer(
+    res = model.infer(
         tokenizer,
         prompt=prompt,
         image_file=image_path,
@@ -195,7 +195,14 @@ def _infer_one_page(image_path: str, out_dir: str) -> str:
         crop_mode=True,
         save_results=True,
         test_compress=True,
+        # https://huggingface.co/deepseek-ai/DeepSeek-OCR/discussions/62
+        # please know that you need to set eval_mode=True when using the model.infer() 
+        # method as shown in the example if you actually want to have anything returned.
+        eval_mode=True
     )
+
+    print("infer type:", type(res), flush=True)
+    print("infer repr:", repr(res)[:500], flush=True)
 
     text_out = _read_saved_text(out_dir)
     return text_out
@@ -224,7 +231,7 @@ async def extract(req: OCRRequest):
         for i, image_path in enumerate(image_paths):
             page_out_dir = os.path.join(out_dir, f"page_{i+1:04d}")
             texts.append(await _infer_one_page_async(image_path, page_out_dir))
-        
+
         # Option B: limited concurrency (still risky on GPU)
         # texts = await asyncio.gather(*[
         #     _infer_one_page_async(p, os.path.join(out_dir, f"page_{i+1:04d}"))
