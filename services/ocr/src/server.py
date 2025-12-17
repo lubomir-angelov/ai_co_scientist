@@ -8,6 +8,9 @@ from datetime import datetime, timezone
 from contextlib import asynccontextmanager
 import asyncio
 import shutil
+import glob
+import json
+
 
 # --- keep your flash-attn disables, do this BEFORE importing transformers ---
 os.environ["TRANSFORMERS_ATTENTION_IMPLEMENTATION"] = "eager"
@@ -70,6 +73,44 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+def _read_saved_text(output_dir: str) -> str:
+    # Prefer markdown
+    md_files = sorted(glob.glob(os.path.join(output_dir, "**", "*.md"), recursive=True))
+    for p in md_files:
+        try:
+            with open(p, "r", encoding="utf-8", errors="ignore") as f:
+                t = f.read().strip()
+            if t:
+                return t
+        except Exception:
+            continue
+
+    # Then JSON
+    json_files = sorted(glob.glob(os.path.join(output_dir, "**", "*.json"), recursive=True))
+    for p in json_files:
+        try:
+            with open(p, "r", encoding="utf-8", errors="ignore") as f:
+                obj = json.load(f)
+            for k in ("text", "markdown", "md", "result", "output"):
+                v = obj.get(k)
+                if isinstance(v, str) and v.strip():
+                    return v.strip()
+        except Exception:
+            continue
+
+    # Then plain text
+    txt_files = sorted(glob.glob(os.path.join(output_dir, "**", "*.txt"), recursive=True))
+    for p in txt_files:
+        try:
+            with open(p, "r", encoding="utf-8", errors="ignore") as f:
+                t = f.read().strip()
+            if t:
+                return t
+        except Exception:
+            continue
+
+    return ""
 
 def is_pdf_bytes(data: bytes) -> bool:
     # PDF files start with: %PDF-
@@ -141,11 +182,10 @@ _page_sem = asyncio.Semaphore(PAGE_CONCURRENCY)
 
 
 def _infer_one_page(image_path: str, out_dir: str) -> str:
-    """
-    Synchronous wrapper for model.infer; safe to call via asyncio.to_thread.
-    """
+    os.makedirs(out_dir, exist_ok=True)
+
     prompt = "<image>\n<|grounding|>Convert the document to markdown."
-    res = model.infer(
+    _ = model.infer(
         tokenizer,
         prompt=prompt,
         image_file=image_path,
@@ -157,9 +197,8 @@ def _infer_one_page(image_path: str, out_dir: str) -> str:
         test_compress=True,
     )
 
-    if isinstance(res, dict):
-        return (res.get("text", "") or "")
-    return ""
+    text_out = _read_saved_text(out_dir)
+    return text_out
 
 
 async def _infer_one_page_async(image_path: str, out_dir: str) -> str:
@@ -182,9 +221,10 @@ async def extract(req: OCRRequest):
 
         # sequential OCR but non-blocking event loop
         texts = []
-        for p in image_paths:
-            texts.append(await _infer_one_page_async(p, out_dir))
-
+        for i, image_path in enumerate(image_paths):
+            page_out_dir = os.path.join(out_dir, f"page_{i+1:04d}")
+            texts.append(await _infer_one_page_async(image_path, page_out_dir))
+        
         # Option B: limited concurrency (still risky on GPU)
         # texts = await asyncio.gather(*[
         #     _infer_one_page_async(p, os.path.join(out_dir, f"page_{i+1:04d}"))

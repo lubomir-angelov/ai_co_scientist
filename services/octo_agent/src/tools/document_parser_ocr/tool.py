@@ -22,7 +22,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 import requests
 
-from octo_agent.tools.base import BaseTool
+from tools.base import BaseTool
 
 
 _URL_RE = re.compile(r"^(http|https|ftp)://", re.IGNORECASE)
