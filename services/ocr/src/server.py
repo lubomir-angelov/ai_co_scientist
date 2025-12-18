@@ -32,6 +32,8 @@ from shared_library.data_contracts import (
     OCRTable,
 )
 
+from utils import parse_deepseek_grounded_output, blocks_to_markdown
+
 MODEL_PATH = "/opt/models/deepseek-ocr"
 
 logger = logging.getLogger("__name__")
@@ -201,11 +203,30 @@ def _infer_one_page(image_path: str, out_dir: str) -> str:
         eval_mode=True
     )
 
-    print("infer type:", type(res), flush=True)
-    print("infer repr:", repr(res)[:500], flush=True)
+    #print("infer type:", type(res), flush=True)
+    #print("infer repr:", repr(res)[:500], flush=True)
 
-    text_out = _read_saved_text(out_dir)
-    return text_out
+    text_out = ""
+
+    if isinstance(res, str):
+        blocks = parse_deepseek_grounded_output(res)
+        text_out = blocks_to_markdown(blocks)
+    else:
+        blocks = []
+        # fallback to reading saved files if needed, etc.
+
+    # Optionally: store structured blocks in metadata for debugging
+    metadata_extra = {
+        "block_count": len(blocks),
+        # "blocks": [b.__dict__ for b in blocks],  # careful: can be large
+    }
+
+    metadata_extra["layout_blocks"] = [
+    {"ref": b.ref, "bbox": b.bbox, "text": b.text[:200]}
+        for b in blocks[:200]
+    ]
+
+    return text_out, metadata_extra
 
 
 async def _infer_one_page_async(image_path: str, out_dir: str) -> str:
@@ -228,9 +249,12 @@ async def extract(req: OCRRequest):
 
         # sequential OCR but non-blocking event loop
         texts = []
+        metadata_pages = []
         for i, image_path in enumerate(image_paths):
             page_out_dir = os.path.join(out_dir, f"page_{i+1:04d}")
-            texts.append(await _infer_one_page_async(image_path, page_out_dir))
+            page_text, page_metadata = await asyncio.to_thread(_infer_one_page, image_path, page_out_dir)
+            texts.append(page_text)
+            metadata_pages.append(page_metadata)
 
         # Option B: limited concurrency (still risky on GPU)
         # texts = await asyncio.gather(*[
@@ -257,6 +281,7 @@ async def extract(req: OCRRequest):
                 "engine": "deepseek-ocr",
                 "page_count": len(image_paths),
                 "page_concurrency": PAGE_CONCURRENCY,
+                "pages": metadata_pages,
             },
         )
 
