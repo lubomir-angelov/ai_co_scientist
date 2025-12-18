@@ -3,11 +3,11 @@ import time
 import json
 from typing import Optional
 
-from .models.initializer import Initializer
-from .models.planner import Planner
-from .models.memory import Memory
-from .models.executor import Executor
-from .models.utils import make_json_serializable_truncated
+from models.initializer import Initializer
+from models.planner import Planner
+from models.memory import Memory
+from models.executor import Executor
+from models.utils import make_json_serializable_truncated
 
 class Solver:
     def __init__(
@@ -234,17 +234,17 @@ def construct_solver(llm_engine_name : str = "gpt-4o",
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Run the octotools demo with specified parameters.")
-    parser.add_argument("--llm_engine_name", default="gpt-4o", help="LLM engine name.")
+    parser.add_argument("--llm_engine_name", default="local-llm", help="LLM engine name.")
     parser.add_argument(
         "--output_types",
         default="base,final,direct",
         help="Comma-separated list of required outputs (base,final,direct)"
     )
-    parser.add_argument("--enabled_tools", default="Generalist_Solution_Generator_Tool", help="List of enabled tools.")
+    parser.add_argument("--enabled_tools", default="Document_Parser_OCR_Tool", help="List of enabled tools.")
     parser.add_argument("--root_cache_dir", default="solver_cache", help="Path to solver cache directory.")
     parser.add_argument("--max_tokens", type=int, default=4000, help="Maximum tokens for LLM generation.")
     parser.add_argument("--max_steps", type=int, default=10, help="Maximum number of steps to execute.")
-    parser.add_argument("--max_time", type=int, default=300, help="Maximum time allowed in seconds.")
+    parser.add_argument("--max_time", type=int, default=600, help="Maximum time allowed in seconds.")
     parser.add_argument("--verbose", type=bool, default=True, help="Enable verbose output.")
     return parser.parse_args()
     

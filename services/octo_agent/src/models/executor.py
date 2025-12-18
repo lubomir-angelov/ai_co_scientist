@@ -6,8 +6,8 @@ import signal
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from octotools.engine.factory import create_llm_engine
-from octotools.models.formatters import ToolCommand
+from engine.factory import create_llm_engine
+from models.formatters import ToolCommand
 
 try:
     TimeoutError

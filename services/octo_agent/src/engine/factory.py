@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from .local_llm import ChatLocalLLM  # noqa: F401
+from local_llm import ChatLocalLLM  # noqa: F401
 
 def create_llm_engine(
     model_string: str,

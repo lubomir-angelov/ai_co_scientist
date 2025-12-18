@@ -5,9 +5,9 @@ from typing import Any, Dict, List, Tuple
 
 from PIL import Image
 
-from octotools.engine.factory import create_llm_engine
-from octotools.models.formatters import MemoryVerification, NextStep, QueryAnalysis
-from octotools.models.memory import Memory
+from engine.factory import create_llm_engine
+from models.formatters import MemoryVerification, NextStep, QueryAnalysis
+from models.memory import Memory
 
 
 class Planner:

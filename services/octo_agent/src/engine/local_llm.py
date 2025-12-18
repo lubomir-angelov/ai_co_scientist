@@ -6,7 +6,7 @@ Adapted from octotools engine pattern
 from typing import Union, Optional
 import httpx
 
-from .base import EngineLM, CachedEngine
+from base import EngineLM, CachedEngine
 
 class ChatLocalLLM(EngineLM, CachedEngine):
     """

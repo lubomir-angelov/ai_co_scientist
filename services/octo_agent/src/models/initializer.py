@@ -5,6 +5,7 @@ import inspect
 import traceback
 from typing import Dict, Any, List, Tuple
 import time
+
 class Initializer:
     def __init__(self, enabled_tools: List[str] = [], model_string: str = None, verbose: bool = False, vllm_config_path: str = None):
         self.toolbox_metadata = {}
@@ -195,7 +196,7 @@ class Initializer:
         self.vllm_server_process = vllm_process
 
 if __name__ == "__main__":
-    enabled_tools = ["Generalist_Solution_Generator_Tool"]
+    enabled_tools = ["Document_Parser_OCR_Tool"]
     initializer = Initializer(enabled_tools=enabled_tools)
 
     print("\nAvailable tools:")
