@@ -168,6 +168,38 @@ test-tools-integration: install
 	@$(MAKE) test-ocr
 
 
+# ---- Tools -----------------------------------------------------------
+
+.PHONY: test-document-parser
+test-document-parser:
+	@echo "Running: tools.document_parser_ocr.tool"
+	@echo "PYTHONPATH=$(SRC_DIR)"
+	@echo "OCR_URL=$(OCR_URL)"
+	@if [ -n "$(OCR_SAMPLE_INPUT)" ]; then echo "OCR_SAMPLE_INPUT=$(OCR_SAMPLE_INPUT)"; fi
+	@PYTHONPATH="$(SRC_DIR)" \
+	  OCR_URL="$(OCR_URL)" \
+	  OCR_SAMPLE_INPUT="$(OCR_SAMPLE_INPUT)" \
+	  $(PYTHON) -m tools.document_parser_ocr.tool
+
+.PHONY: test-document-parser-pdf
+test-document-parser-pdf:
+	@if [ -z "$(OCR_SAMPLE_INPUT)" ]; then \
+		echo "Set OCR_SAMPLE_INPUT to a PDF path, e.g.:"; \
+		echo "  make test-document-parser-pdf OCR_SAMPLE_INPUT=./src/tools/document_parser_ocr/examples/sample.pdf"; \
+		exit 1; \
+	fi
+	@$(MAKE) test-document-parser
+
+.PHONY: test-document-parser-img
+test-document-parser-img:
+	@if [ -z "$(OCR_SAMPLE_INPUT)" ]; then \
+		echo "Set OCR_SAMPLE_INPUT to an image path, e.g.:"; \
+		echo "  make test-document-parser-img OCR_SAMPLE_INPUT=./src/tools/document_parser_ocr/examples/sample.png"; \
+		exit 1; \
+	fi
+	@$(MAKE) test-document-parser
+
+
 # ---- Maintenance -----------------------------------------------------------
 
 .PHONY: clean
