@@ -8,13 +8,13 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from local_llm import ChatLocalLLM  # noqa: F401
+from engine.local_llm import ChatLocalLLM  # noqa: F401
 
 def create_llm_engine(
     model_string: str,
     use_cache: bool = False,
     is_multimodal: bool = True,
-    base_url: str = None,
+    base_url: str = "http://localhost:8002",
     api_key: str = None,
     **kwargs
 ) -> Any:

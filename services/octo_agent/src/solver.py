@@ -247,10 +247,23 @@ def parse_arguments():
     parser.add_argument("--max_time", type=int, default=600, help="Maximum time allowed in seconds.")
     parser.add_argument("--verbose", type=bool, default=True, help="Enable verbose output.")
     return parser.parse_args()
+
+def _parse_enabled_tools(value: str) -> list[str]:
+    """Parse the enabled tools from a comma-separated string."""
+    
+    s = (value or "").strip()
+    if not s:
+        return []
+    if s.lower() == "all":
+        return ["all"]
+    return [x.strip() for x in s.split(",") if x.strip()]
     
 def main(args):
+    # Parse enabled tools to list
+    enabled_tools = _parse_enabled_tools(args.enabled_tools)
+
     solver = construct_solver(llm_engine_name=args.llm_engine_name, 
-                              enabled_tools=args.enabled_tools, 
+                              enabled_tools=enabled_tools, 
                               output_types=args.output_types, 
                               max_steps=args.max_steps, 
                               max_time=args.max_time, 
