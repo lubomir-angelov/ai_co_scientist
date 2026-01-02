@@ -6,4 +6,4 @@ pydantic==2.12.5
 pillow==12.0.0
 diskcache==5.6.3
 requests==2.32.5
-pdf2image==2.32.5
+pdf2image==1.17.0
