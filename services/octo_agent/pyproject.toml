@@ -1,0 +1,120 @@
+# pyproject.toml — octo_agent (orchestrator service)
+#
+# Notes:
+# - Uses setuptools (no Poetry).
+# - Assumes a src-layout: services/orchestrator/src/...
+# - Ruff is the linter/formatter.
+# - Test deps are optional extras; you can also keep requirements_test.txt if you prefer.
+# Lyubomir Angelov - 24346001 - Second year masters in AI - 09.01.2025
+
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "octo-agent"
+version = "0.1.0"
+description = "AI Co-Scientist orchestrator (agent loop, tool registry, service orchestration)."
+readme = "README.md"
+requires-python = ">=3.11,<3.14"
+license = { text = "Proprietary" }
+authors = [{ name = "AI Co-Scientist" }]
+keywords = ["agent", "orchestrator", "tools", "llm", "ocr", "memory"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "License :: Other/Proprietary License",
+  "Operating System :: OS Independent",
+]
+
+dependencies = [
+  "httpx>=0.27.0",
+  "pydantic>=2.6.0",
+]
+
+[project.optional-dependencies]
+test = [
+  "pytest>=8.0.0",
+  "pytest-asyncio>=0.23.0",
+  "coverage[toml]>=7.6.0",
+]
+dev = [
+  "ruff>=0.6.0",
+  "mypy>=1.10.0",
+  "types-setuptools",
+]
+all = [
+  "octo-agent[test,dev]",
+]
+
+# If you later expose a CLI entrypoint, uncomment and implement src/octo_agent/cli.py:main
+# [project.scripts]
+# octo-agent = "octo_agent.cli:main"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["src"]
+exclude = ["tests*"]
+
+# -------------------------
+# Ruff (lint + format)
+# -------------------------
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+extend-exclude = [
+  "vendor/",
+  ".venv/",
+  "venv/",
+  "build/",
+  "dist/",
+]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM"]
+ignore = [
+  "E501", # line length handled by formatter
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["octo_agent", "src"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"
+
+# -------------------------
+# Pytest
+# -------------------------
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = ["-q"]
+asyncio_mode = "auto"
+
+# -------------------------
+# Coverage
+# -------------------------
+[tool.coverage.run]
+branch = true
+source = ["src"]
+
+[tool.coverage.report]
+show_missing = true
+skip_empty = true
+
+# -------------------------
+# MyPy (optional)
+# -------------------------
+[tool.mypy]
+python_version = "3.11"
+mypy_path = "src"
+warn_unused_configs = true
+ignore_missing_imports = true
+no_implicit_optional = true
+check_untyped_defs = true
+warn_return_any = true
+warn_unused_ignores = true
