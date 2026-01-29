@@ -88,6 +88,7 @@ Please present your analysis in a clear, structured format.
             except Exception as e:
                 print(f"Error reading image file: {str(e)}")
 
+        print(input_data)
         self.query_analysis = self.llm_engine_mm(input_data, response_format=QueryAnalysis)
 
         return str(self.query_analysis).strip()

@@ -38,6 +38,9 @@ class ChatLocalLLM(EngineLM, CachedEngine):
             cache_path: Cache directory path
             **kwargs: Additional arguments
         """
+        # Hard code the used model for local llm gateway
+        if model_string.lower() in {"local-llm", "local", "vllm"}:
+            model_string = "Corianas/DeepSeek-R1-Distill-Qwen-14B-AWQ"
         self.model_string = model_string
         self.base_url = base_url.rstrip('/')
         self.api_key = api_key
@@ -100,6 +103,8 @@ class ChatLocalLLM(EngineLM, CachedEngine):
             "max_tokens": max_tokens,
             "temperature": temperature,
         }
+
+        print("Sending model:", self.model_string)
         
         try:
             response = httpx.post(
