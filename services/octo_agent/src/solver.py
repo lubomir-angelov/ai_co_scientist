@@ -182,7 +182,7 @@ class Solver:
 
         return json_data
 
-def construct_solver(llm_engine_name : str = "gpt-4o",
+def construct_solver(llm_engine_name : str = "Corianas/DeepSeek-R1-Distill-Qwen-14B-AWQ",
                      enabled_tools : list[str] = ["all"],
                      output_types : str = "final,direct",
                      max_steps : int = 10,
@@ -246,6 +246,11 @@ def parse_arguments():
     parser.add_argument("--max_steps", type=int, default=10, help="Maximum number of steps to execute.")
     parser.add_argument("--max_time", type=int, default=600, help="Maximum time allowed in seconds.")
     parser.add_argument("--verbose", type=bool, default=True, help="Enable verbose output.")
+
+    # My added args
+    parser.add_argument("--question", required=True, help="User question/task to solve.")
+    parser.add_argument("--image_path", default=None, help="Optional image/PDF path for tools that accept it.")
+
     return parser.parse_args()
 
 def _parse_enabled_tools(value: str) -> list[str]:
@@ -272,7 +277,8 @@ def main(args):
                               verbose=args.verbose)
 
     # Solve the task or problem
-    solver.solve("What is the capital of France?")
+    # solver.solve("What is the capital of France?")
+    solver.solve(args.question, image_path=args.image_path)
 
 if __name__ == "__main__":
     args = parse_arguments()

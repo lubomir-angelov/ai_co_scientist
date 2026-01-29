@@ -11,11 +11,11 @@ from typing import Any
 from engine.local_llm import ChatLocalLLM  # noqa: F401
 
 def create_llm_engine(
-    model_string: str,
+    model_string: str = "Corianas/DeepSeek-R1-Distill-Qwen-14B-AWQ", # default to qwen
     use_cache: bool = False,
     is_multimodal: bool = True,
-    base_url: str = "http://localhost:8002",
-    api_key: str = None,
+    base_url: str = "http://localhost:8000/v1",
+    api_key: str = "local-llm", # Default to local llm
     **kwargs
 ) -> Any:
     """

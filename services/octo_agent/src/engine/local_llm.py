@@ -18,7 +18,7 @@ class ChatLocalLLM(EngineLM, CachedEngine):
     
     def __init__(
         self,
-        model_string: str,
+        model_string: str = "Corianas/DeepSeek-R1-Distill-Qwen-14B-AWQ",
         base_url: str = "http://llm-gateway:9000/v1",
         api_key: str = "local-llm",
         use_cache: bool = False,

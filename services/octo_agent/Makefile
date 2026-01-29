@@ -27,7 +27,13 @@ PROJECT := ai-co-orchestrator
 
 .PHONY: help
 help: ## Show available targets
-	@awk 'BEGIN {FS = ":.*##"; printf "\nTargets:\n"} /^[a-zA-Z0-9_\-]+:.*?##/ { printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
+	@awk 'BEGIN { printf "\nTargets:\n" } \
+	/^[a-zA-Z0-9][a-zA-Z0-9_.-]*:([^=]|$$)/ { \
+	  if ($$1 ~ /^\./) next; \
+	  tgt=$$1; sub(/:.*/, "", tgt); \
+	  desc=""; pos=index($$0,"##"); if (pos) desc=substr($$0,pos+3); \
+	  printf "  \033[36m%-20s\033[0m %s\n", tgt, desc; \
+	}' $(MAKEFILE_LIST)
 
 # ---- Virtual Environment ---------------------------------------------------
 
@@ -76,24 +82,6 @@ pythonpath: ## Show PYTHONPATH
 test: install-test ## Run all tests
 	@PYTHONPATH=$(PYTHONPATH) $(PYTEST) tests/ -v
 
-.PHONY: test-registry
-test-registry: install-test ## Run tools registry tests
-	@PYTHONPATH=$(PYTHONPATH) $(PYTEST) tests/test_tools_registry.py -v
-
-.PHONY: test-agent
-test-agent: install-test ## Run agent loop tests
-	@PYTHONPATH=$(PYTHONPATH) $(PYTEST) tests/test_agent_loop.py -v
-
-.PHONY: test-coverage
-test-coverage: install-test ## Run tests with coverage report
-	@PYTHONPATH=$(PYTHONPATH) $(PYTEST) tests/ -v --cov=src --cov-report=html
-	@echo "✓ Coverage report generated in htmlcov/index.html"
-
-.PHONY: test-watch
-test-watch: install-test ## Run tests on file changes (requires pytest-watch)
-	@$(PIP) install pytest-watch
-	@PYTHONPATH=$(PYTHONPATH) ptw tests/ -- -v
-
 # ---- Linting & Formatting --------------------------------------------------
 
 .PHONY: lint
@@ -123,7 +111,7 @@ run-agent: install ## Run agent loop (set TASK env var)
 
 
 .PHONY: test-ocr
-test-ocr:
+test-ocr: install ## Test OCR service (integration)
 	@echo "Testing OCR service (integration)..."
 	@payload="$$(jq -n --arg doc_id "smoke-test" --arg content_b64 "$(SMOKE_PDF_B64)" '{doc_id:$$doc_id, content_b64:$$content_b64}')"; \
 	curl -sS --fail-with-body --connect-timeout 2 --max-time 60 \
@@ -134,8 +122,9 @@ test-ocr:
 	&& echo "✓ OCR OK" || echo "✗ OCR failed"
 
 .PHONY: test-llm
-test-llm: install
+test-llm: install ## Test LLM service (integration)
 	@echo "Testing LLM service (integration)..."
+	@echo "$(LLM_URL)/v1/chat/completions"
 	@tmp_body="$$(mktemp)"; tmp_hdr="$$(mktemp)"; \
 	payload="$$(jq -n \
 	  --arg model "Corianas/DeepSeek-R1-Distill-Qwen-14B-AWQ" \
@@ -161,7 +150,7 @@ test-llm: install
 
 
 .PHONY: test-tools-integration
-test-tools-integration: install
+test-tools-integration: install ## Run tools integration tests (LLM + OCR)
 	@echo "Running tools integration tests LLM + OCR ..."
 	## Run LLM + OCR integration checks
 	@$(MAKE) test-llm
