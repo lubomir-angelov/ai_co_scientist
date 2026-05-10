@@ -108,32 +108,32 @@ services:
         condition: service_healthy
 
   # OCR Service - DeepSeek OCR for document/image understanding
-  ocr:
-    build:
-      context: .
-      dockerfile: ./services/ocr/Dockerfile
-      args:
-        BASE_IMAGE: nvidia/cuda:12.8.1-cudnn-devel-ubuntu22.04
-        SERVICES_DIR: services
-        SERVICE_NAME: ocr
-    environment:
-      CUDA_VISIBLE_DEVICES: "1"
-      HF_HOME: /workspace/hf-cache
-      TRANSFORMERS_ATTENTION_IMPLEMENTATION: eager
-      TRANSFORMERS_NO_FLASH_ATTENTION: "1"
-    ports:
-      - "8002:8002"
-    gpus:
-      - device: 1
-    depends_on:
-      llm-gateway:
-        condition: service_started
-    healthcheck:
-      test: ["CMD", "curl", "-sf", "http://localhost:8002/healthz"]
-      interval: 30s
-      timeout: 5s
-      retries: 10
-      start_period: 120s
+  # ocr:
+  #   build:
+  #     context: .
+  #     dockerfile: ./services/ocr/Dockerfile
+  #     args:
+  #       BASE_IMAGE: nvidia/cuda:12.8.1-cudnn-devel-ubuntu22.04
+  #       SERVICES_DIR: services
+  #       SERVICE_NAME: ocr
+  #   environment:
+  #     CUDA_VISIBLE_DEVICES: "1"
+  #     HF_HOME: /workspace/hf-cache
+  #     TRANSFORMERS_ATTENTION_IMPLEMENTATION: eager
+  #     TRANSFORMERS_NO_FLASH_ATTENTION: "1"
+  #   ports:
+  #     - "8002:8002"
+  #   gpus:
+  #     - device: 1
+  #   depends_on:
+  #     llm-gateway:
+  #       condition: service_started
+  #   healthcheck:
+  #     test: ["CMD", "curl", "-sf", "http://localhost:8002/healthz"]
+  #     interval: 30s
+  #     timeout: 5s
+  #     retries: 10
+  #     start_period: 120s
 
   # Orchestrator - Agent loop that coordinates between services
   orchestrator:
