@@ -139,7 +139,7 @@ services:
   orchestrator:
     build:
       context: .
-      dockerfile: ./services/orchestrator/Dockerfile
+      dockerfile: ./services/octo_agent/Dockerfile
     environment:
       LLM_BASE_URL: http://llm-gateway:8000/v1
       LLM_API_KEY: ${LLM_API_KEY:-local-llm}

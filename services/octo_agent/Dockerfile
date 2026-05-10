@@ -8,11 +8,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements
-COPY services/orchestrator/requirements.txt ./requirements.txt
+COPY services/octo_agent/requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy orchestrator service
-COPY services/orchestrator/src/ ./src/
+# Copy octo_agent service
+COPY services/octo_agent/src/ ./src/
 
 # Copy shared library
 COPY services/common/src/ ./common_src/
