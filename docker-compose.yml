@@ -3,22 +3,93 @@ version: "3.9"
 name: ai-co-scientist
 
 services:
-  # LLM Service - OpenAI-compatible LLM inference with vLLM
+  # LLM Service - llama.cpp turboquant hotswap server
   llm:
-    image: vllm/vllm-openai:latest
-    command: >
-      --model ${LLM_MODEL:-deepseek-ai/DeepSeek-R1-Distill-Qwen-14B}
-      --max-model-len 32768
-      --gpu-memory-utilization 0.90
-      --trust-remote-code
-      --port 8000
+    image: docker.io/gtonkov/llamacpp-turboquant:latest
+    container_name: ai-co-llm-llama-cpp
+    restart: unless-stopped
+
+    command:
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8080"
+
+      # llama.cpp router mode: load GGUF models from /models
+      - --models-dir
+      - /models
+      - --models-max
+      - "1"
+
+      # Original runtime settings
+      - --n-gpu-layers
+      - "-1"
+      - --mlock
+      - --no-mmap
+
+      # Use this for 256k context
+      - --ctx-size
+      - "262144"
+
+      - --batch-size
+      - "2048"
+      - --ubatch-size
+      - "512"
+
+      - -np
+      - "1"
+
+      - --cache-reuse
+      - "256"
+      - --cache-ram
+      - "20000"
+
+      - --cache-type-k
+      - turbo4
+      - --cache-type-v
+      - turbo4
+
+      - --flash-attn
+      - "on"
+
+      - --jinja
+
+      - --temp
+      - "0.6"
+      - --top-p
+      - "0.95"
+      - --top-k
+      - "20"
+      - --min-p
+      - "0.0"
+      - --repeat-penalty
+      - "1.0"
+      - --presence-penalty
+      - "0.0"
+
+    volumes:
+      - ./models/hotswap:/models:ro
+
     environment:
-      VLLM_LOGGING_LEVEL: INFO
+      LLAMA_LOG_LEVEL: info
+
     ports:
-      - "8000:8000"     # raw vLLM API
+      - "8000:8080"     # host localhost:8000 -> container llm:8080
+
     gpus: all
+
+    cap_add:
+      - IPC_LOCK
+
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+
+    mem_limit: 64g
+
     healthcheck:
-      test: ["CMD", "bash", "-lc", "curl -sf http://localhost:8000/v1/models > /dev/null"]
+      test: ["CMD", "bash", "-lc", "curl -sf http://localhost:8080/v1/models > /dev/null"]
       interval: 30s
       timeout: 5s
       retries: 20
@@ -28,7 +99,7 @@ services:
   llm-gateway:
     build: ./services/llm/src/gateway
     environment:
-      UPSTREAM_BASE_URL: http://llm:8000/v1
+      UPSTREAM_BASE_URL: http://llm:8080/v1
       API_KEY: ${LLM_API_KEY:-local-llm}
     ports:
       - "9000:8000"     # public OpenAI-compatible entrypoint
@@ -51,7 +122,7 @@ services:
       TRANSFORMERS_ATTENTION_IMPLEMENTATION: eager
       TRANSFORMERS_NO_FLASH_ATTENTION: "1"
     ports:
-      - "8002:8002"     # OCR extraction endpoint
+      - "8002:8002"
     gpus:
       - device: 1
     depends_on:
