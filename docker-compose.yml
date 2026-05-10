@@ -149,8 +149,8 @@ services:
     depends_on:
       llm-gateway:
         condition: service_started
-      ocr:
-        condition: service_healthy
+      # ocr:
+      #   condition: service_healthy
 
   # NOTE: Memory service (graph store) is not included yet - implementation pending
 
