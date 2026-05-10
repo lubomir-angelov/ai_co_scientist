@@ -192,3 +192,4 @@ examples/notebooks/local_model/*
 **/outputs
 **/logs
 **/detected_ocr
+models/
