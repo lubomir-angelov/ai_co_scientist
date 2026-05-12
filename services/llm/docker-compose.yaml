@@ -47,6 +47,8 @@ services:
       - --no-mmap
       - --ctx-size
       - "262144"
+      - --chat-template-kwargs
+      - '{"enable_thinking":false}'
       - --batch-size
       - "2048"
       - --ubatch-size
@@ -79,7 +81,7 @@ services:
 
     volumes:
       - ../../models/hotswap:/models:ro
-    
+
     environment:
       LLAMA_LOG_LEVEL: info
 
