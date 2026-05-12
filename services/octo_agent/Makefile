@@ -127,10 +127,10 @@ test-llm: install ## Test LLM service (integration)
 	@echo "$(LLM_URL)/v1/chat/completions"
 	@tmp_body="$$(mktemp)"; tmp_hdr="$$(mktemp)"; \
 	payload="$$(jq -n \
-	  --arg model "Corianas/DeepSeek-R1-Distill-Qwen-14B-AWQ" \
-	  --arg msg "ping" \
-	  '{model:$$model,messages:[{role:"user",content:$$msg}],temperature:0,max_tokens:8,stream:false}')" ; \
-	code="$$(curl -sS --connect-timeout 2 --max-time 120 \
+	  --arg model "Qwen3.6-27B-UD-Q5_K_XL" \
+	  --arg msg "Reply with exactly one word: pong" \
+	  '{model:$$model,messages:[{role:"user",content:$$msg}],temperature:0,max_tokens:64,stream:false}')" ; \
+	code="$$(curl -sS --connect-timeout 2 --max-time 180 \
 	  -D "$$tmp_hdr" -o "$$tmp_body" \
 	  -H "Authorization: Bearer local-llm" \
 	  -H "Content-Type: application/json" \
@@ -138,7 +138,7 @@ test-llm: install ## Test LLM service (integration)
 	  "$(LLM_URL)/v1/chat/completions" \
 	  -w "%{http_code}" || echo 000)"; \
 	if [ "$$code" -ge 200 ] && [ "$$code" -lt 300 ]; then \
-	  jq -er '.choices[0].message.content | strings | select(length>0)' "$$tmp_body" >/dev/null \
+	  jq -er '(.choices[0].message // {}) as $$m | ((($$m.content // "") | length > 0) or (($$m.reasoning_content // "") | length > 0))' "$$tmp_body" >/dev/null \
 	    && echo "✓ LLM OK" || (echo "✗ LLM returned unexpected JSON"; sed -n '1,120p' "$$tmp_body"; exit 1); \
 	else \
 	  echo "✗ LLM failed (HTTP $$code)"; \
