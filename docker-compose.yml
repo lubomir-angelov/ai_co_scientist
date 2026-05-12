@@ -28,6 +28,8 @@ services:
       # Use this for 256k context
       - --ctx-size
       - "262144"
+      - --chat-template-kwargs
+      - '{"enable_thinking":false}'
 
       - --batch-size
       - "2048"
