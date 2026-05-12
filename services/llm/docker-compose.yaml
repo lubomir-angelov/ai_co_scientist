@@ -1,5 +1,3 @@
-version: "3.9"
-
 name: ai-co-llm
 
 services:
