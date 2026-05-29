@@ -22,7 +22,7 @@ services:
   #     start_period: 60s
 
   llm:
-    image: docker.io/gtonkov/llamacpp-turboquant:latest
+    image: docker.io/gtonkov/llamacpp-mtp:latest 
     container_name: ai-co-llm-llama-cpp
     restart: unless-stopped
 
@@ -43,10 +43,14 @@ services:
       - "-1"
       - --mlock
       - --no-mmap
+      - --spec-type 
+      - "mtp" 
+      - --spec-draft-n-max 
+      - "3"
       - --ctx-size
       - "262144"
       - --chat-template-kwargs
-      - '{"enable_thinking":false}'
+      - '{"enable_thinking":true}'
       - --batch-size
       - "2048"
       - --ubatch-size
@@ -58,9 +62,9 @@ services:
       - --cache-ram
       - "20000"
       - --cache-type-k
-      - turbo4
+      - q8_0
       - --cache-type-v
-      - turbo4
+      - q8_0
       - --flash-attn
       - "on"
       - --jinja
