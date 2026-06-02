@@ -3,7 +3,8 @@ name: ai-co-scientist
 services:
   # LLM Service - llama.cpp turboquant hotswap server
   llm:
-    image: docker.io/gtonkov/llamacpp-turboquant:latest
+    #image: docker.io/gtonkov/llamacpp-turboquant:latest
+    image: docker.io/gtonkov/llamacpp-mtp:latest
     container_name: ai-co-llm-llama-cpp
     restart: unless-stopped
 

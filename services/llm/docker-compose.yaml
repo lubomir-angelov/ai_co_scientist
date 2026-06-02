@@ -47,29 +47,36 @@ services:
       - "mtp" 
       - --spec-draft-n-max 
       - "3"
+
       - --ctx-size
       - "262144"
       - --chat-template-kwargs
       - '{"enable_thinking":true}'
+
       - --batch-size
       - "2048"
       - --ubatch-size
       - "512"
+
       - -np
       - "1"
       - --cache-reuse
       - "256"
       - --cache-ram
       - "20000"
+
       - --cache-type-k
       - q4_0
       #- q8_0
       - --cache-type-v
       - q4_0
       #- q8_0
+
       - --flash-attn
       - "on"
+
       - --jinja
+      
       - --temp
       - "0.6"
       - --top-p
