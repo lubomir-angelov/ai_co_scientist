@@ -38,6 +38,10 @@ MODEL_PATH = "/opt/models/deepseek-ocr"
 
 logger = logging.getLogger("__name__")
 
+# Initialize globals so healthz can check them before model loads
+tokenizer = None
+model = None
+
 
 # load once
 @asynccontextmanager
@@ -75,6 +79,15 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.get("/healthz")
+async def healthz():
+    return {
+        "status": "ok",
+        "service": "ocr",
+        "ready": model is not None and tokenizer is not None,
+    }
 
 def _read_saved_text(output_dir: str) -> str:
     # Prefer markdown
