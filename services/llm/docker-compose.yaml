@@ -62,9 +62,11 @@ services:
       - --cache-ram
       - "20000"
       - --cache-type-k
-      - q8_0
+      - q4_0
+      #- q8_0
       - --cache-type-v
-      - q8_0
+      - q4_0
+      #- q8_0
       - --flash-attn
       - "on"
       - --jinja
