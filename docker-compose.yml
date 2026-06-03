@@ -25,12 +25,16 @@ services:
       - "-1"
       - --mlock
       - --no-mmap
+      - --spec-type
+      - "mtp"
+      - --spec-draft-n-max
+      - "3"
 
       # Use this for 256k context
       - --ctx-size
       - "262144"
       - --chat-template-kwargs
-      - '{"enable_thinking":false}'
+      - '{"enable_thinking":true}'
 
       - --batch-size
       - "2048"
@@ -46,9 +50,11 @@ services:
       - "20000"
 
       - --cache-type-k
-      - turbo4
+      - q8_0
+        #- turbo4
       - --cache-type-v
-      - turbo4
+      - q8_0
+        #- turbo4
 
       - --flash-attn
       - "on"
@@ -56,7 +62,8 @@ services:
       - --jinja
 
       - --temp
-      - "0.6"
+        #- "0.6"
+      = "1.0"
       - --top-p
       - "0.95"
       - --top-k
