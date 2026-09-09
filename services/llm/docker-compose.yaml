@@ -1,28 +1,9 @@
 name: ai-co-llm
 
 services:
-  # llm:
-  #   image: vllm/vllm-openai:latest
-  #   command: >
-  #     --model ${LLM_MODEL:-deepseek-ai/DeepSeek-R1-Distill-Qwen-14B}
-  #     --max-model-len 32768
-  #     --gpu-memory-utilization 0.90
-  #     --trust-remote-code
-  #     --port 8000
-  #   environment:
-  #     VLLM_LOGGING_LEVEL: INFO
-  #   ports:
-  #     - "8000:8000"
-  #   gpus: all
-  #   healthcheck:
-  #     test: ["CMD", "bash", "-lc", "curl -sf http://localhost:8000/v1/models > /dev/null"]
-  #     interval: 30s
-  #     timeout: 5s
-  #     retries: 20
-  #     start_period: 60s
-
   llm:
-    image: docker.io/gtonkov/llamacpp-mtp:latest 
+    #image: docker.io/gtonkov/llamacpp-turboquant:latest
+    image: ghcr.io/ggml-org/llama.cpp:server-cuda12-b10830
     container_name: ai-co-llm-llama-cpp
     restart: unless-stopped
 
@@ -32,26 +13,37 @@ services:
       - --port
       - "8080"
 
-      # llama.cpp router mode: load GGUF models from /models
-      - --models-dir
-      - /models
-      - --models-max
-      - "1"
+      # Main model
+      - --model
+      - /models/Qwen3.8-27B-UD-Q4_K_XL/Qwen3.8-27B-UD-Q4_K_XL.gguf
 
-      # Original runtime settings
+      # MTP sidecar
+      - --model-draft
+      - /models/Qwen3.8-27B-UD-Q4_K_XL/mtp-Qwen3.8-27B-Q4_0.gguf
+
+      # Vision projector
+      - --mmproj
+      - /models/Qwen3.8-27B-UD-Q4_K_XL/mmproj-F16.gguf
+
+      # Runtime settings
       - --n-gpu-layers
       - "-1"
-      - --mlock
-      - --no-mmap
-      - --spec-type 
-      - "mtp" 
-      - --spec-draft-n-max 
+
+      # Replaces both --mlock and --no-mmap
+      - --load-mode
+      - mlock
+
+      # MTP type is detected automatically from --model-draft
+      - --spec-draft-n-max
       - "3"
 
+      # Replaces enable_thinking in --chat-template-kwargs
+      - --reasoning
+      - "on"
+
+      # Use this for 256k context
       - --ctx-size
       - "262144"
-      - --chat-template-kwargs
-      - '{"enable_thinking":true}'
 
       - --batch-size
       - "2048"
@@ -60,17 +52,18 @@ services:
 
       - -np
       - "1"
+
       - --cache-reuse
       - "256"
       - --cache-ram
       - "20000"
 
       - --cache-type-k
-      - q4_0
-      #- q8_0
+      - q8_0
+        #- turbo4
       - --cache-type-v
-      - q4_0
-      #- q8_0
+      - q8_0
+        #- turbo4
 
       - --flash-attn
       - "on"
@@ -78,6 +71,7 @@ services:
       - --jinja
 
       - --temp
+        #- "0.6"
       - "1.0"
       - --top-p
       - "0.95"
@@ -112,7 +106,11 @@ services:
     mem_limit: 64g
 
     healthcheck:
-      test: ["CMD", "bash", "-lc", "curl -sf http://localhost:8080/v1/models > /dev/null"]
+      test:
+        - CMD
+        - bash
+        - -lc
+        - curl -sf http://localhost:8080/v1/models > /dev/null
       interval: 30s
       timeout: 5s
       retries: 20

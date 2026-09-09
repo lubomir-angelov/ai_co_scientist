@@ -4,7 +4,7 @@ services:
   # LLM Service - llama.cpp turboquant hotswap server
   llm:
     #image: docker.io/gtonkov/llamacpp-turboquant:latest
-    image: docker.io/gtonkov/llamacpp-mtp:latest
+    image: ghcr.io/ggml-org/llama.cpp:server-cuda12-b10830
     container_name: ai-co-llm-llama-cpp
     restart: unless-stopped
 
@@ -20,21 +20,25 @@ services:
       - --models-max
       - "1"
 
-      # Original runtime settings
+      # Runtime settings
       - --n-gpu-layers
       - "-1"
-      - --mlock
-      - --no-mmap
-      - --spec-type
-      - "mtp"
+
+      # Replaces both --mlock and --no-mmap
+      - --load-mode
+      - mlock
+
+      # MTP type is detected automatically from --model-draft
       - --spec-draft-n-max
       - "3"
+
+      # Replaces enable_thinking in --chat-template-kwargs
+      - --reasoning
+      - "on"
 
       # Use this for 256k context
       - --ctx-size
       - "262144"
-      - --chat-template-kwargs
-      - '{"enable_thinking":true}'
 
       - --batch-size
       - "2048"
