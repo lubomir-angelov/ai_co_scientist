@@ -1,32 +1,27 @@
 # Services
 
-We employ several microservices that constitue the ai_co_scientist.
-
-Those are:
+Each directory is an independently buildable microservice with its own `Makefile`,
+`compose.yaml` (except `common`) and tests. The root `docker-compose.yml` includes the compose
+files. See `../DOCKER_COMPOSE.md`.
 
 ```
-ai_co_scientist/
-├── docker-compose.yml
-├── services/
-│   ├── orchestrator/ # This is where we wrap OctoTools itself. This service is the “brain that calls tools.” 
-                      # It should not try to be the tools.
-│   │   │
-│   │   ├── src/
-│   │   │   ├── agent_loop.py
-│   │   │   ├── tools_registry.py
-│   │   │   ├── adapters/        # http wrappers for OCR, memory, etc.
-│   │   │   └── runtime_config.py
-│   │   ├── Dockerfile
-│   │   └── tests/
-│   │   │ # The rest are all called by the orchestrator. Each exposes a tiny, well-defined HTTP API.
-│   ├── memory/
-│   ├── llm/
-│   └── ocr/
-│   ├── common/ # Is crucial. We don’t duplicate schemas, timestamps, provenance logic or logging config in four places. 
-                # We make a light shared lib we can import from each service.
-│   │   
-└── vendor/
-    └── octotools/   <-- git submodule of the original repo
+services/
+├── llm/          # llama.cpp server (Qwen3.8 27B) + API-key gateway          :8000 / :9000
+├── ocr/          # DeepSeek-OCR FastAPI service (GPU)                          :8002
+├── ocr_mcp/      # MCP server exposing OCR as tools                            :8003
+├── memory/       # Graphiti temporal knowledge graph (+ FalkorDB, embeddings) :8005
+├── octo_agent/   # OctoTools-style planner/executor/solver + tool wrappers     :8001 (opt-in)
+└── common/       # shared_library: cross-service contracts and interfaces
+```
+
+Every Python service's Makefile has the same core targets:
+
+```bash
+make -C services/<svc> help
+make -C services/<svc> install   # per-service virtualenv (octo_agent: ~/venvs/ai_cosc_orchestrator)
+make -C services/<svc> test
+make -C services/<svc> lint      # ruff
+make -C services/<svc> up        # run this service standalone (docker compose)
 ```
 
 # How-To's

@@ -17,7 +17,7 @@ To test the document parsing tool, follow these steps:
    cd octo_agent
    
    # Add the octo_agent source code to the PYTHONPATH 
-   export PYTHONPATH="$(pwd)/src"
+   export PYTHONPATH="$(pwd)/src:$(pwd)/../common/src"
    ```
 
 
@@ -29,15 +29,14 @@ To test the document parsing tool, follow these steps:
 
 ## File Structure
 
-The project is organized as follows:
-
 ```sh
-├── __init__.py                       # Initializes the tools package and possibly exposes submodules
-├── base.py                           # Base class for tools, providing common functionality
-├── document_parser_ocr/              # Directory for the document parsing tool
-│   ├── readme.md                     # Documentation for the document parsing tool
-│   └── tool.py                       # Implementation of the document parsing tool
-├── advanced_object_detector/         # Directory for the object detection tool
-│   ├── readme.md                     # Documentation for the object detection tool
-│   └── tool.py                       # Implementation of the object detection tool
+├── __init__.py
+├── base.py                    # BaseTool: metadata + execute() contract
+├── document_parser_ocr/       # Document_Parser_OCR_Tool -> OCR service
+│   ├── README.md
+│   └── tool.py
+└── memory_graph/              # Memory_Graph_Tool -> memory service
+    └── tool.py
 ```
+
+The initializer discovers tools by directory name: class `Foo_Bar_Tool` lives in `foo_bar/tool.py`.

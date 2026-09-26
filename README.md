@@ -10,43 +10,53 @@ The agent focuses on three main capabilities:
   4. Ability to run consumer-grade hardware.
 
 # Structure
-The repository structure is as follows:
 
 ```
 ai_co_scientist/
-├── docker-compose.yml
-├── Makefile
-├── opencode.json
-├── services/
-│   ├── llm/
-│   ├── ocr/
-│   ├── ocr_mcp/          # MCP server wrapping the OCR service
-│   ├── octo_agent/
-│   └── memory/
+├── docker-compose.yml   # includes services/*/compose.yaml
+├── Makefile             # stack + dev targets (make help)
+├── STATUS.md            # current status and next steps
+├── DOCKER_COMPOSE.md    # compose layout, configuration, troubleshooting
+├── models/              # GGUF models (git-ignored): hotswap/ (LLM), embeddings/
+└── services/
+    ├── llm/             # llama.cpp + API-key gateway
+    ├── ocr/             # DeepSeek-OCR service
+    ├── ocr_mcp/         # MCP server wrapping the OCR service
+    ├── memory/          # Graphiti + FalkorDB temporal knowledge graph
+    ├── octo_agent/      # planner / executor / solver + tool wrappers
+    └── common/          # shared_library (contracts)
 ```
-
 
 ## Quick Start
 
 ```bash
-# Build and start all services
-make build
-make up
+cp .env.example .env               # optional; the defaults work locally
+make install && make test          # per-service venvs + unit tests (no GPU needed)
+
+make build                         # docker images (the OCR image is ~70 GB)
+make up                            # full stack, Qwen thinking off
 make health
 
-# Or just the OCR + MCP stack
-make ocr-mcp-build
-make ocr-mcp-up
+LLM_REASONING=on make up           # same, with thinking on
+make llm-up && make memory-up      # just the LLM + memory
+make -C services/llm up            # one service standalone (thinking on by default)
+make down
 ```
+
+Prerequisites (GPU setup, model files) are covered in `DOCKER_COMPOSE.md`.
 
 ## Services
 
 | Service | Port | Description |
 |---------|------|-------------|
-| `llm` | 8000 | llama.cpp local LLM (OpenAI-compatible) |
+| `llm` | 8000 | llama.cpp local LLM (OpenAI-compatible), Qwen3.8 27B |
+| `llm-gateway` | 9000 | API-key proxy for the LLM (`Authorization: Bearer local-llm`) |
 | `ocr` | 8002 | DeepSeek-OCR document extraction |
 | `ocr-mcp` | 8003 | MCP server exposing OCR tools to agents |
-| `octo_agent` | 8001 | Orchestrator agent loop |
+| `memory` | 8005 | Temporal knowledge-graph memory (Graphiti) |
+| `falkordb` | 6379 | Graph database for memory |
+| `embeddings` | 8006 | llama.cpp embeddings (Qwen3-Embedding-0.6B, CPU) |
+| `orchestrator` | 8001 | Agent loop (opt-in: `make agent-up`; entrypoint not implemented yet) |
 
 ## MCP Servers
 

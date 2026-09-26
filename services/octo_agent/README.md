@@ -1,45 +1,54 @@
-# Usage
-cd services/orchestrator
+# octo_agent (orchestrator)
 
-# Setup venv and install dependencies
-make venv
-make install
-make install-test
+An OctoTools-style agent: an `Initializer` loads tools, a `Planner` picks sub-goals and
+tools, an `Executor` generates and runs tool commands, `Memory` is the per-run scratchpad,
+and the `Solver` loop ties them together (`src/solver.py`, `src/models/`).
 
-# Show PYTHONPATH
-make pythonpath
+Tools live in `src/tools/<name>/tool.py` and are discovered by class name:
 
-# Run tests with PYTHONPATH set
-make test
-make test-registry
+| Tool | Wraps |
+|---|---|
+| `Document_Parser_OCR_Tool` | OCR service `POST /ocr/extract` |
+| `Memory_Graph_Tool` | Memory service: `search`, `changes`, `record_step`, `record_hypothesis` |
 
-# Run Python with PYTHONPATH
-make python SCRIPT=scripts/test_tools.py
+Configuration: `LLM_BASE_URL`, `LLM_API_KEY`, `OCR_BASE_URL`, `MEMORY_BASE_URL` (see
+`src/runtime_config.py`).
 
-# Activate venv
-source ~/venvs/ai_cosc_orchestrator/bin/activate
+> **Status:** the HTTP entrypoint (`src/agent_loop.py`) the Dockerfile expects doesn't exist
+> yet, so the compose service sits behind the `agent` profile. The LLM engine still defaults
+> to the old DeepSeek model and URL (`src/engine/`). See `STATUS.md`.
 
-# Run solver locally
+## Development
+
+The virtualenv lives at `~/venvs/ai_cosc_orchestrator`.
+
 ```bash
-export LLM_MODEL_ID="Corianas/DeepSeek-R1-Distill-Qwen-14B-AWQ"
-
-python solver.py \
-  --llm_engine_name local-llm \
-  --enabled_tools all \
-  --output_types final,direct \
-  --question "Given a FastAPI service and an OCR microservice, propose an integration test strategy and list 8 concrete tests."
+cd services/octo_agent
+make install-test   # venv + deps + test deps
+make test           # unit tests
+make lint           # ruff
+make fmt
+make help           # all targets
 ```
 
-# Debug
+Integration checks against running services:
+
 ```bash
-curl -sS http://localhost:8000/openapi.json | jq -r '.paths | keys[]' | sort | head -n 50
+make test-llm       # LLM_URL (default http://localhost:8000), LLM_MODEL
+make test-ocr       # OCR_URL (default http://localhost:8002)
+```
 
-curl -sS http://localhost:8000/v1/models | jq -r '.data[].id' | head -n 20
+Running the solver CLI:
 
-MODEL="Corianas/DeepSeek-R1-Distill-Qwen-14B-AWQ"
-MODEL="$(curl -sS http://localhost:8000/v1/models | jq -r '.data[0].id')"
-curl -sS -o /dev/null -w "%{http_code}\n" -X POST http://localhost:8000/v1/chat/completions \
-  -H "Authorization: Bearer local-llm" -H "Content-Type: application/json" \
-  -d "{\"model\":\"$MODEL\",\"messages\":[{\"role\":\"user\",\"content\":\"ping\"}],\"max_tokens\":8}"
+```bash
+make run-solver ARGS='--enabled_tools all --output_types final,direct \
+  --question "Summarise what we know about microring Q factors."'
+```
 
+Manual checks for a single tool:
+
+```bash
+cd services/octo_agent
+PYTHONPATH=src:../common/src ~/venvs/ai_cosc_orchestrator/bin/python -m tools.document_parser_ocr.tool
+PYTHONPATH=src:../common/src ~/venvs/ai_cosc_orchestrator/bin/python -m tools.memory_graph.tool
 ```
