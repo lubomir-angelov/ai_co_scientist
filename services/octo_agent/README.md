@@ -111,7 +111,10 @@ already-in-flight work or fail identically for every remaining paper).
 `failed`/`blocked` paper (the logged summary lists each one with its full error); an aborted
 or preflight-failed run propagates as an exception (non-zero, with a traceback).
 
-**Expected duration for a large corpus** (measured on this stack, 44 s/page OCR,
-~120 s/page ingest): phase 1 ≈ pages × 44 s; phase 2 ≈ pages × 120 s. For ~2,200 pages that is
-roughly a day of OCR followed by roughly three days of ingest — `make papers-status` is the
-way to check progress without interrupting a multi-day run.
+**Expected duration for a large corpus** (measured live on this stack, RTX 5090 32 GB GPU,
+2026-09-26): OCR ≈ 37 s/page with the GPU to itself; ingest ≈ 134 s/page. A 20-page paper
+measured 747 s of OCR and 2688 s of ingest (22 episodes). For ~2,200 pages that is roughly
+23 h of OCR followed by roughly 3.4 days of ingest — measured on this machine, not a
+guarantee for other hardware. `make papers-status` is the way to check progress without
+interrupting a multi-day run; see the root [`README.md`](../../README.md#ingesting-papers)
+for running both phases unattended with `nohup` (recommended) or `tmux`.
