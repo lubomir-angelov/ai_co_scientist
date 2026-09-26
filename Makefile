@@ -1,6 +1,6 @@
 # Root Makefile - ai_co_scientist
 
-.PHONY: help up down build restart logs ps health test lint format ocr-mcp-up ocr-mcp-down ocr-mcp-build
+.PHONY: help up down build restart logs ps health test lint format ocr-mcp-up ocr-mcp-down ocr-mcp-build memory-up memory-down memory-build
 
 help:
 	@echo "make up              - start all services"
@@ -16,6 +16,9 @@ help:
 	@echo "make ocr-mcp-up      - start OCR + OCR MCP service"
 	@echo "make ocr-mcp-down    - stop OCR + OCR MCP service"
 	@echo "make ocr-mcp-build   - build OCR + OCR MCP images"
+	@echo "make memory-up       - start FalkorDB + embeddings + memory service"
+	@echo "make memory-down     - stop FalkorDB + embeddings + memory service"
+	@echo "make memory-build    - build the memory service image"
 
 up:
 	docker compose up -d
@@ -43,10 +46,17 @@ health:
 	curl -sf http://localhost:8002/healthz && echo "" || echo "FAIL"
 	@echo "=== OCR MCP ===" && \
 	curl -sf http://localhost:8003/mcp > /dev/null && echo "OK" || echo "FAIL"
+	@echo "=== FalkorDB ===" && \
+	docker compose exec -T falkordb redis-cli ping 2>/dev/null || echo "FAIL"
+	@echo "=== Embeddings ===" && \
+	curl -sf http://localhost:8006/health && echo "" || echo "FAIL"
+	@echo "=== Memory ===" && \
+	curl -sf http://localhost:8005/health && echo "" || echo "FAIL"
 
 test:
 	$(MAKE) -C services/ocr test 2>/dev/null || true
 	$(MAKE) -C services/common test 2>/dev/null || true
+	$(MAKE) -C services/memory test
 
 lint:
 	ruff check services/
@@ -65,3 +75,13 @@ ocr-mcp-up:
 
 ocr-mcp-down:
 	docker compose down ocr ocr-mcp
+
+# Memory stack (graph DB + embeddings + service); extraction also needs the llm stack.
+memory-build:
+	docker compose build memory
+
+memory-up:
+	docker compose up -d falkordb embeddings memory
+
+memory-down:
+	docker compose stop memory embeddings falkordb

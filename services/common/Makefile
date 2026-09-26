@@ -2,7 +2,7 @@
 
 PYTHON ?= python
 # add src/ so "import shared_library" works from this folder
-export PYTHONPATH := $(PWD)/src:$(PYTHONPATH)
+export PYTHONPATH := $(CURDIR)/src:$(PYTHONPATH)
 
 .PHONY: help
 help:

@@ -1,109 +1,60 @@
 # services/memory/Makefile
 
-# ---------- Basic config ----------
+PYTHON ?= python
 
-BASE_IMAGE ?= python:3.11-slim
-IMAGE_TAG  ?= memory-service
-
-CONTAINER_PORT ?= 8005
-HOST_PORT      ?= 8005
-
-PYTHON    ?= python
-APP_MODULE := src.app:app
+IMAGE_TAG ?= memory-service
+HOST_PORT ?= 8005
 HOST      := 0.0.0.0
 
-# FalkorDB config for local dev
-FALKORDB_IMAGE           ?= falkordb/falkordb:latest
-FALKORDB_CONTAINER_NAME  ?= falkordb-memory
-FALKORDB_PORT            ?= 6379
+# FalkorDB for local development
+FALKORDB_IMAGE          ?= falkordb/falkordb-server:v4.20.7
+FALKORDB_CONTAINER_NAME ?= falkordb-memory
+FALKORDB_PORT           ?= 6379
 
-# repo root (two levels up from services/memory)
-REPO_ROOT  := $(abspath $(PWD)/../..)
-SERVICE_DIR := services/memory
+# Local LLM / embeddings (host ports published by the root docker-compose.yml)
+MEMORY_LLM_BASE_URL       ?= http://localhost:9000/v1
+MEMORY_LLM_MODEL          ?= Qwen3.8-27B-UD-Q4_K_XL
+MEMORY_EMBEDDING_BASE_URL ?= http://localhost:8006/v1
 
-# add these at the top of the Makefile
-PWD := $(shell pwd)
-# Adjust PYTHONPATH so local imports work if needed
-export PYTHONPATH := $(PWD):$(PWD)/../shared_library:$(PYTHONPATH)
-
-
-# ---------- Help ----------
+PWD       := $(shell pwd)
+REPO_ROOT := $(abspath $(PWD)/../..)
+export PYTHONPATH := $(PWD)/src:$(PWD)/../common/src:$(PYTHONPATH)
 
 .PHONY: help
 help:
-	@echo "make install        - install memory service + shared_library into current venv"
-	@echo "make run            - start FalkorDB (docker) and run uvicorn locally on $(HOST):$(HOST_PORT)"
-	@echo "make run-falkordb   - start FalkorDB docker container only"
-	@echo "make docker-build   - build docker image for memory service"
-	@echo "make docker-run     - run docker container for memory service"
-	@echo "make test           - run pytest"
-	@echo "make fmt            - run ruff format + ruff check"
-
-
-# ---------- Install ----------
+	@echo "make install        - install service + test deps and shared_library into current venv"
+	@echo "make run-falkordb   - start a local FalkorDB container on port $(FALKORDB_PORT)"
+	@echo "make run            - start FalkorDB and run the service with reload on $(HOST):$(HOST_PORT)"
+	@echo "make test           - run unit tests (no FalkorDB / LLM needed)"
+	@echo "make fmt            - ruff format + ruff check"
+	@echo "make docker-build   - build the service image (context: repo root)"
+	@echo "make health         - query /health on localhost:$(HOST_PORT)"
 
 .PHONY: install
 install:
-	$(PYTHON) -m pip install -r requirements.txt
-	[ -f requirements_test.txt ] && $(PYTHON) -m pip install -r requirements_test.txt || true
-	@if [ -d "../common" ]; then \
-	  cd ../common && $(PYTHON) -m pip install -e . ; \
-	fi
-	# optional: install ruff for local formatting
-	$(PYTHON) -m pip install ruff
-
-
-# ---------- FalkorDB (local, via Docker) ----------
+	$(PYTHON) -m pip install -r ../common/requirements.txt -r requirements.txt -r requirements_test.txt
+	$(PYTHON) -m pip install --no-deps -e ../common -e .
 
 .PHONY: run-falkordb
 run-falkordb:
-	@echo "Ensuring FalkorDB container '$(FALKORDB_CONTAINER_NAME)' is running on port $(FALKORDB_PORT)..."
-	@if ! docker ps --format '{{.Names}}' | grep -q '^$(FALKORDB_CONTAINER_NAME)$$'; then \
-	  if docker ps -a --format '{{.Names}}' | grep -q '^$(FALKORDB_CONTAINER_NAME)$$'; then \
-	    echo "Starting existing FalkorDB container $(FALKORDB_CONTAINER_NAME)..."; \
-	    docker start $(FALKORDB_CONTAINER_NAME) >/dev/null; \
-	  else \
-	    echo "Running new FalkorDB container $(FALKORDB_CONTAINER_NAME)..."; \
-	    docker run -d --name $(FALKORDB_CONTAINER_NAME) -p $(FALKORDB_PORT):6379 $(FALKORDB_IMAGE) >/dev/null; \
-	  fi \
+	@if docker ps --format '{{.Names}}' | grep -q '^$(FALKORDB_CONTAINER_NAME)$$'; then \
+	  echo "FalkorDB container $(FALKORDB_CONTAINER_NAME) already running"; \
+	elif docker ps -a --format '{{.Names}}' | grep -q '^$(FALKORDB_CONTAINER_NAME)$$'; then \
+	  docker start $(FALKORDB_CONTAINER_NAME) >/dev/null; \
 	else \
-	  echo "FalkorDB container $(FALKORDB_CONTAINER_NAME) already running."; \
+	  docker run -d --name $(FALKORDB_CONTAINER_NAME) -p $(FALKORDB_PORT):6379 \
+	    -e REDIS_ARGS="--appendonly yes" $(FALKORDB_IMAGE) >/dev/null; \
 	fi
-
-
-# ---------- Run locally ----------
 
 .PHONY: run
 run: run-falkordb
-	MEMORY_GRAPHITI_URI=falkor://localhost:6379 \
-	MEMORY_GRAPH_NAME=photonic_memory \
-	MEMORY_LLM_PROVIDER=openai \
-	MEMORY_EMBEDDING_PROVIDER=openai \
-	$(PYTHON) -m uvicorn $(APP_MODULE) --host $(HOST) --port $(HOST_PORT) --reload
-
-
-# ---------- Docker image ----------
-
-.PHONY: docker-build
-docker-build:
-	cd $(REPO_ROOT) && \
-	docker build \
-	  --build-arg BASE_IMAGE="$(BASE_IMAGE)" \
-	  -t "$(IMAGE_TAG)" \
-	  -f $(SERVICE_DIR)/Dockerfile .
-
-.PHONY: docker-run
-docker-run:
-	docker run -it --rm \
-	  -p $(HOST_PORT):$(CONTAINER_PORT) \
-	  -e MEMORY_GRAPHITI_URI=falkor://falkordb:6379 \
-	  -e MEMORY_GRAPH_NAME=photonic_memory \
-	  -e MEMORY_LLM_PROVIDER=openai \
-	  -e MEMORY_EMBEDDING_PROVIDER=openai \
-	  "$(IMAGE_TAG)"
-
-
-# ---------- Tests & formatting ----------
+	MEMORY_FALKORDB_HOST=localhost \
+	MEMORY_FALKORDB_PORT=$(FALKORDB_PORT) \
+	MEMORY_LLM_BASE_URL=$(MEMORY_LLM_BASE_URL) \
+	MEMORY_LLM_MODEL=$(MEMORY_LLM_MODEL) \
+	MEMORY_EMBEDDING_BASE_URL=$(MEMORY_EMBEDDING_BASE_URL) \
+	GRAPHITI_TELEMETRY_ENABLED=false \
+	$(PYTHON) -m uvicorn memory_service.app:create_app --factory --host $(HOST) --port $(HOST_PORT) --reload
 
 .PHONY: test
 test:
@@ -111,5 +62,13 @@ test:
 
 .PHONY: fmt
 fmt:
-	ruff format .
-	ruff check .
+	ruff format src tests
+	ruff check src tests
+
+.PHONY: docker-build
+docker-build:
+	cd $(REPO_ROOT) && docker build -t "$(IMAGE_TAG)" -f services/memory/Dockerfile .
+
+.PHONY: health
+health:
+	curl -sf http://localhost:$(HOST_PORT)/health && echo
