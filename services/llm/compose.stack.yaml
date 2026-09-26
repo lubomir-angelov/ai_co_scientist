@@ -1,0 +1,7 @@
+# Overrides applied when the LLM runs as part of the full stack (root docker-compose.yml).
+# Thinking is off by default there: Graphiti's structured extraction does not need it
+# and it multiplies latency. Re-enable with:  LLM_REASONING=on make up
+services:
+  llm:
+    environment:
+      LLAMA_ARG_REASONING: ${LLM_REASONING:-off}

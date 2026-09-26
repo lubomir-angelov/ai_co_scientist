@@ -3,10 +3,11 @@ Local LLM Engine Adapter - communicates with LLM Gateway service
 Adapted from octotools engine pattern
 """
 
-from typing import Union, Optional
+
 import httpx
 
-from engine.base import EngineLM, CachedEngine
+from engine.base import CachedEngine, EngineLM
+
 
 class ChatLocalLLM(EngineLM, CachedEngine):
     """
@@ -62,7 +63,7 @@ class ChatLocalLLM(EngineLM, CachedEngine):
     def generate(
         self,
         prompt: str,
-        system_prompt: Optional[str] = None,
+        system_prompt: str | None = None,
         max_tokens: int = 4000,
         temperature: float = 0.7,
         **kwargs
@@ -125,11 +126,11 @@ class ChatLocalLLM(EngineLM, CachedEngine):
             return result
             
         except httpx.HTTPError as e:
-            raise RuntimeError(f"LLM Gateway error: {e}")
+            raise RuntimeError(f"LLM Gateway error: {e}") from e
 
     def __call__(
         self,
-        input_data: Union[str, list],
+        input_data: str | list,
         **kwargs
     ) -> str:
         """

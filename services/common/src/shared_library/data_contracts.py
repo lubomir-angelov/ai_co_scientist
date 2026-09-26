@@ -2,7 +2,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from enum import Enum
 from pydantic import BaseModel, Field, model_validator
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 
 # ocr
 class OCRRequest(BaseModel):

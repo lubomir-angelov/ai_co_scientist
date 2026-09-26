@@ -2,6 +2,33 @@
 
 This docker-compose configuration orchestrates all microservices for the AI Co-Scientist platform.
 
+## Layout (current)
+
+Each service owns its compose file, and the root `docker-compose.yml` only `include:`s them:
+
+| File | Services | Host ports |
+|---|---|---|
+| `services/llm/compose.yaml` (+ `compose.stack.yaml` in the stack) | `llm` (llama.cpp), `llm-gateway` | 8000, 9000 |
+| `services/ocr/compose.yaml` | `ocr` | 8002 |
+| `services/ocr_mcp/compose.yaml` | `ocr-mcp` | 8003 |
+| `services/memory/compose.yaml` | `falkordb`, `embeddings`, `memory` | 6379, 8006, 8005 |
+| `services/octo_agent/compose.yaml` | `orchestrator` (profile `agent`, opt-in) | 8001 |
+
+- **Full stack:** `make up` from the repo root. **One service standalone:** `make -C services/<svc> up`.
+- All files share the network `ai-co-scientist-network`, so separately started services
+  reach each other by service name. The FalkorDB volume is `ai-co-scientist-falkordb-data`
+  in both modes.
+- Cross-file `depends_on` isn't possible (Compose rejects references to services in other
+  files). Services tolerate their dependencies starting later.
+- **Qwen thinking** is set by `LLM_REASONING` (`on`/`off`/`auto`; note that `auto` means on
+  for Qwen). It defaults to `on` for the standalone llm service and `off` in the full stack.
+  Override either with, e.g., `LLM_REASONING=on make up`.
+- The orchestrator's HTTP entrypoint (`src/agent_loop.py`) doesn't exist yet, so it only
+  starts with `make agent-up`.
+
+> The per-service sections below predate the llama.cpp migration. Where they differ, the
+> compose files are authoritative.
+
 ## Services
 
 ### 1. **LLM Service** (Port 8000)

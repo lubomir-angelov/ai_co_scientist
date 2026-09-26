@@ -4,11 +4,10 @@ Creates LLM engine instances
 For our services, we default to ChatLocalLLM (via gateway)
 """
 
-import sys
-from pathlib import Path
 from typing import Any
 
 from engine.local_llm import ChatLocalLLM  # noqa: F401
+
 
 def create_llm_engine(
     model_string: str = "Corianas/DeepSeek-R1-Distill-Qwen-14B-AWQ", # default to qwen

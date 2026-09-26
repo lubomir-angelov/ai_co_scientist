@@ -1,69 +1,81 @@
-# services/ocr/Makefile
+# services/ocr/Makefile - DeepSeek-OCR service (GPU)
 
-BASE_IMAGE ?= nvidia/cuda:12.8.1-cudnn-devel-ubuntu22.04
-IMAGE_TAG  ?= deepseek-ocr-service
+PYTHON  ?= python3
+VENV    ?= .venv
+PY      := $(VENV)/bin/python
+RUFF    := $(if $(wildcard $(VENV)/bin/ruff),$(VENV)/bin/ruff,ruff)
+COMPOSE := docker compose -f compose.yaml
 
-CONTAINER_PORT ?= 8002
-HOST_PORT      ?= 8002
+HOST_PORT ?= 8002
 
-PYTHON ?= python
-APP_MODULE := src.server:app
-HOST := 0.0.0.0
-
-# repo root (two levels up from services/ocr)
-REPO_ROOT := $(abspath $(PWD)/../..)
-SERVICE_DIR := services/ocr
-
+export PYTHONPATH := $(CURDIR)/src:$(CURDIR)/../common/src:$(PYTHONPATH)
 
 .PHONY: help
 help:
-	@echo "make install        - install server + dev deps"
-	@echo "make run            - run uvicorn locally on $(HOST):$(HOST_PORT)"
-	@echo "make docker-build   - build docker image"
-	@echo "make docker-run     - run docker container with GPU"
-	@echo "make test           - run pytest"
-	@echo "make fmt            - run ruff format + ruff check"
-
-# add these at the top of the Makefile
-PWD := $(shell pwd)
-export PYTHONPATH := $(PWD)/src:$(PWD)/../common/src:$(PYTHONPATH)
+	@echo "make install       - create $(VENV) with light test deps (no torch; GPU libs are stubbed in tests)"
+	@echo "make install-full  - add the full GPU runtime deps to $(VENV) (torch, transformers, ...)"
+	@echo "make test          - unit tests"
+	@echo "make lint          - ruff check"
+	@echo "make fmt           - ruff format + ruff check --fix"
+	@echo "make run           - run the server locally (needs install-full, a GPU and the model)"
+	@echo "make build         - build the image (compose.yaml; large, downloads the model)"
+	@echo "make up / down     - start / stop the OCR container"
+	@echo "make logs / ps     - compose logs / status"
+	@echo "make health        - query /healthz on localhost:$(HOST_PORT)"
 
 .PHONY: install
 install:
-	$(PYTHON) -m pip install -r requirements.txt
-	[ -f requirements_test.txt ] && $(PYTHON) -m pip install -r requirements_test.txt || true
-	@if [ -d "../common" ]; then \
-	  cd ../common && $(PYTHON) -m pip install -e . ; \
-	fi
-	# optional: install ruff for local formatting
-	$(PYTHON) -m pip install ruff
+	$(PYTHON) -m venv $(VENV)
+	$(PY) -m pip install -q --upgrade pip
+	$(PY) -m pip install -q -r ../common/requirements.txt -r requirements_test.txt ruff==0.15.12
 
-.PHONY: run
-run:
-	TRANSFORMERS_ATTENTION_IMPLEMENTATION=eager \
-	TRANSFORMERS_NO_FLASH_ATTENTION=1 \
-	$(PYTHON) -m uvicorn $(APP_MODULE) --host $(HOST) --port $(HOST_PORT) --reload
+.PHONY: install-full
+install-full: install
+	$(PY) -m pip install -q -r requirements.txt
 
-.PHONY: docker-build
-docker-build:
-	cd $(REPO_ROOT) && \
-	docker build \
-	  --build-arg BASE_IMAGE="$(BASE_IMAGE)" \
-	  -t "$(IMAGE_TAG)" \
-	  -f $(SERVICE_DIR)/Dockerfile .
-
-.PHONY: docker-run
-docker-run:
-	docker run -it --rm --gpus all \
-	  -p $(HOST_PORT):$(CONTAINER_PORT) \
-	  -v $(PWD)/shared:/workspace/shared \
-	  "$(IMAGE_TAG)"
+.PHONY: check-venv
+check-venv:
+	@test -x $(PY) || { echo "No virtualenv at $(CURDIR)/$(VENV); run 'make install' first"; exit 1; }
 
 .PHONY: test
-test:
-	$(PYTHON) -m pytest -v tests
+test: check-venv
+	$(PY) -m pytest -q tests
+
+.PHONY: lint
+lint:
+	$(RUFF) check src tests
 
 .PHONY: fmt
 fmt:
-	ruff format src
-	ruff check src
+	$(RUFF) format src tests
+	$(RUFF) check --fix src tests
+
+.PHONY: run
+run: check-venv
+	TRANSFORMERS_ATTENTION_IMPLEMENTATION=eager \
+	TRANSFORMERS_NO_FLASH_ATTENTION=1 \
+	$(PY) -m uvicorn src.server:app --host 0.0.0.0 --port $(HOST_PORT) --reload
+
+.PHONY: build
+build:
+	$(COMPOSE) build
+
+.PHONY: up
+up:
+	$(COMPOSE) up -d
+
+.PHONY: down
+down:
+	$(COMPOSE) down
+
+.PHONY: logs
+logs:
+	$(COMPOSE) logs -f
+
+.PHONY: ps
+ps:
+	$(COMPOSE) ps
+
+.PHONY: health
+health:
+	@curl -sf http://localhost:$(HOST_PORT)/healthz && echo || { echo "ocr not reachable on :$(HOST_PORT)"; exit 1; }

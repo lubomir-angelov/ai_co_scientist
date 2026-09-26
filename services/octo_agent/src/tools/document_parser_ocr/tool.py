@@ -18,12 +18,11 @@ import os
 import re
 import time
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any
 
 import requests
 
 from tools.base import BaseTool
-
 
 _URL_RE = re.compile(r"^(http|https|ftp)://", re.IGNORECASE)
 
@@ -33,7 +32,7 @@ class _ToolConfig:
     base_url: str
     timeout_s: int
     verify_tls: bool
-    auth_header: Optional[str]
+    auth_header: str | None
 
 
 class Document_Parser_OCR_Tool(BaseTool):
@@ -91,13 +90,13 @@ class Document_Parser_OCR_Tool(BaseTool):
     def execute(
         self,
         input_path_or_url: str,
-        doc_id: Optional[str] = None,
-        base_url: Optional[str] = None,
+        doc_id: str | None = None,
+        base_url: str | None = None,
         timeout_s: int = 120,
         save_artifacts: bool = True,
         verify_tls: bool = True,
-        auth_header: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        auth_header: str | None = None,
+    ) -> dict[str, Any]:
         cfg = _ToolConfig(
             base_url=(base_url or os.environ.get("OCR_BASE_URL", "http://localhost:8002")).rstrip("/"),
             timeout_s=int(timeout_s),
@@ -123,7 +122,7 @@ class Document_Parser_OCR_Tool(BaseTool):
 
         markdown = self._combine_sections_to_markdown(sections)
 
-        artifacts: Dict[str, Optional[str]] = {"markdown_path": None, "json_path": None}
+        artifacts: dict[str, str | None] = {"markdown_path": None, "json_path": None}
         if save_artifacts:
             artifacts = self._write_artifacts(doc_id_final, markdown, response_json)
 
@@ -160,7 +159,7 @@ class Document_Parser_OCR_Tool(BaseTool):
         safe = re.sub(r"[^a-zA-Z0-9._-]+", "_", base).strip("_")
         return safe or "document"
 
-    def _load_bytes(self, input_path_or_url: str, cfg: _ToolConfig) -> Tuple[bytes, str]:
+    def _load_bytes(self, input_path_or_url: str, cfg: _ToolConfig) -> tuple[bytes, str]:
         if _URL_RE.match(input_path_or_url):
             resp = requests.get(input_path_or_url, timeout=cfg.timeout_s, verify=cfg.verify_tls)
             resp.raise_for_status()
@@ -172,7 +171,7 @@ class Document_Parser_OCR_Tool(BaseTool):
         with open(input_path_or_url, "rb") as f:
             return f.read(), "file"
 
-    def _post_ocr(self, cfg: _ToolConfig, payload: Dict[str, Any]) -> Dict[str, Any]:
+    def _post_ocr(self, cfg: _ToolConfig, payload: dict[str, Any]) -> dict[str, Any]:
         url = f"{cfg.base_url}/ocr/extract"
         headers = {"Content-Type": "application/json"}
         if cfg.auth_header:
@@ -189,8 +188,8 @@ class Document_Parser_OCR_Tool(BaseTool):
 
         return resp.json()
 
-    def _combine_sections_to_markdown(self, sections: List[Dict[str, Any]]) -> str:
-        parts: List[str] = []
+    def _combine_sections_to_markdown(self, sections: list[dict[str, Any]]) -> str:
+        parts: list[str] = []
         for sec in sections:
             name = (sec.get("name") or "").strip()
             text = (sec.get("text") or "").rstrip()
@@ -200,7 +199,7 @@ class Document_Parser_OCR_Tool(BaseTool):
                 parts.append(f"{text}\n")
         return "\n".join(parts).strip() + "\n" if parts else ""
 
-    def _write_artifacts(self, doc_id: str, markdown: str, response_json: Dict[str, Any]) -> Dict[str, Optional[str]]:
+    def _write_artifacts(self, doc_id: str, markdown: str, response_json: dict[str, Any]) -> dict[str, str | None]:
         out_dir = self.output_dir or os.path.join(os.getcwd(), "ocr_outputs")
         os.makedirs(out_dir, exist_ok=True)
 

@@ -1,0 +1,23 @@
+# Orchestrator (octo_agent). Opt-in: its HTTP entrypoint (src/agent_loop.py) does not
+# exist yet, so it is behind the "agent" profile and not started by a plain `up`.
+# Start explicitly with:  docker compose --profile agent up -d orchestrator
+name: ai-co-orchestrator
+
+services:
+  orchestrator:
+    profiles: ["agent"]
+    build:
+      context: ../..
+      dockerfile: services/octo_agent/Dockerfile
+    environment:
+      LLM_BASE_URL: ${LLM_BASE_URL:-http://llm-gateway:8000/v1}
+      LLM_API_KEY: ${LLM_API_KEY:-local-llm}
+      OCR_BASE_URL: ${OCR_BASE_URL:-http://ocr:8002}
+      MEMORY_BASE_URL: ${MEMORY_BASE_URL:-http://memory:8005}
+    ports:
+      - "8001:8000"
+
+networks:
+  default:
+    # Shared by every service compose file, so standalone services reach each other by name.
+    name: ai-co-scientist-network

@@ -1,0 +1,29 @@
+# OCR MCP service: exposes the OCR service as MCP tools (streamable HTTP).
+# Standalone: make -C services/ocr_mcp up   (expects the ocr service on the shared network,
+# or set OCR_BASE_URL)
+name: ai-co-ocr-mcp
+
+services:
+  ocr-mcp:
+    build:
+      context: ../..
+      dockerfile: services/ocr_mcp/Dockerfile
+    environment:
+      OCR_BASE_URL: ${OCR_BASE_URL:-http://ocr:8002}
+      MCP_TRANSPORT: streamable-http
+      MCP_HOST: 0.0.0.0
+      MCP_PORT: "8003"
+      OCR_REQUEST_TIMEOUT: "300"
+    ports:
+      - "8003:8003"
+    healthcheck:
+      # MCP endpoints reject plain GETs, so check that the port accepts connections.
+      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('localhost', 8003), 3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+networks:
+  default:
+    # Shared by every service compose file, so standalone services reach each other by name.
+    name: ai-co-scientist-network

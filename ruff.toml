@@ -1,0 +1,5 @@
+# Repo-wide ruff defaults. Services with their own [tool.ruff] section in
+# pyproject.toml (memory, octo_agent) use that instead.
+# Rules are listed explicitly so results don't change when ruff's defaults do.
+[lint]
+select = ["E4", "E7", "E9", "F"]

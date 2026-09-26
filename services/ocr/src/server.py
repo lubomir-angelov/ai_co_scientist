@@ -29,7 +29,6 @@ from shared_library.data_contracts import (
     OCRRequest,
     OCRResponse,
     OCRSection,
-    OCRTable,
 )
 
 from utils import parse_deepseek_grounded_output, blocks_to_markdown

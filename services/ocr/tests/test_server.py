@@ -1,61 +1,43 @@
 # services/ocr/tests/test_server.py
 import base64
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 from fastapi.testclient import TestClient
+
 from src.server import app
-import src.server as server  # we'll patch globals on this
 
 
-class FakeModel:
-    def infer(
-        self,
-        tokenizer,
-        prompt: str,
-        image_file: str,
-        output_path: str,
-        base_size: int,
-        image_size: int,
-        crop_mode: bool,
-        save_results: bool,
-        test_compress: bool,
-    ):
-        # mimic real DeepSeek-OCR return shape
-        return {"text": "hello from fake ocr"}
+def _client() -> TestClient:
+    # Not used as a context manager, so the model-loading lifespan never runs.
+    return TestClient(app)
 
 
-class FakeTokenizer:
-    pass
-
-
-@patch("src.server.lifespan")  # don't run real startup
-@patch("src.server._bytes_to_image_path", return_value="/tmp/fake.jpg")
-def test_ocr_endpoint_returns_200(_mock_path, _mock_load):
-    client = TestClient(app)
-
-    # inject fake globals that the endpoint uses
-    server.model = FakeModel()
-    server.tokenizer = FakeTokenizer()
-
+@patch("src.server._infer_one_page", return_value=("hello from fake ocr", {"page": 1}))
+@patch(
+    "src.server._bytes_to_image_paths_async",
+    new_callable=AsyncMock,
+    return_value=(["/tmp/fake-page-1.jpg"], []),
+)
+def test_ocr_endpoint_returns_200(_mock_paths, _mock_infer):
     content_b64 = base64.b64encode(b"fake-image").decode()
 
-    resp = client.post(
-        "/ocr/extract",
-        json={"doc_id": "doc-123", "content_b64": content_b64},
-    )
+    resp = _client().post("/ocr/extract", json={"doc_id": "doc-123", "content_b64": content_b64})
 
     assert resp.status_code == 200
     data = resp.json()
     assert data["doc_id"] == "doc-123"
-    assert data["sections"][0]["text"] == "hello from fake ocr"
+    assert [s["name"] for s in data["sections"]] == ["FullText", "Page 1"]
+    assert data["sections"][1]["text"] == "hello from fake ocr"
+    assert data["metadata"]["page_count"] == 1
 
 
-@patch("src.server.lifespan")
-def test_ocr_endpoint_rejects_bad_base64(_mock_load):
-    client = TestClient(app)
-    resp = client.post(
-        "/ocr/extract",
-        json={"doc_id": "doc-123", "content_b64": "!!not base64!!"},
-    )
+def test_ocr_endpoint_rejects_bad_base64():
+    resp = _client().post("/ocr/extract", json={"doc_id": "doc-123", "content_b64": "!!not base64!!"})
     assert resp.status_code == 400
     assert "Invalid base64" in resp.json()["detail"]
+
+
+def test_healthz_reports_not_ready_before_model_load():
+    body = _client().get("/healthz").json()
+    assert body["service"] == "ocr"
+    assert body["ready"] is False

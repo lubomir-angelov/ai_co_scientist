@@ -3,7 +3,7 @@ from openai import OpenAI
 
 base_url = os.getenv("LLM_BASE_URL", "http://localhost:9000/v1")
 api_key  = os.getenv("LLM_API_KEY", "local-llm")
-model    = os.getenv("LLM_MODEL", "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B")
+model    = os.getenv("LLM_MODEL", "Qwen3.8-27B-UD-Q4_K_XL")
 
 client = OpenAI(base_url=base_url, api_key=api_key)
 

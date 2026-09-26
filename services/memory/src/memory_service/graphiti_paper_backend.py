@@ -87,8 +87,9 @@ def _paper_header(paper: PaperMeta) -> str:
     parts = [f"Paper: {paper.title} ({paper.paper_id})"]
     if paper.authors:
         parts.append(f"Authors: {', '.join(paper.authors)}")
-    if paper.venue or paper.year:
-        parts.append(f"Published: {' '.join(str(p) for p in (paper.venue, paper.year) if p)}")
+    published = paper.published_at.date().isoformat() if paper.published_at else paper.year
+    if paper.venue or published:
+        parts.append(f"Published: {' '.join(str(p) for p in (paper.venue, published) if p)}")
     return "\n".join(parts)
 
 
@@ -194,6 +195,7 @@ class GraphitiPaperMemoryBackend(PaperMemoryBackend):
                 entity_types=ENTITY_TYPES,
                 custom_extraction_instructions=EXTRACTION_INSTRUCTIONS,
             )
+            await self._date_undated_facts(result.edges, reference_time)
 
         logger.info(
             "Episode ingested: name=%s uuid=%s nodes=%d edges=%d seconds=%.1f",
@@ -209,6 +211,24 @@ class GraphitiPaperMemoryBackend(PaperMemoryBackend):
             nodes_extracted=len(result.nodes),
             facts_extracted=len(result.edges),
         )
+
+    async def _date_undated_facts(self, edges: list[EntityEdge], reference_time: datetime) -> None:
+        """
+        Graphiti only sets valid_at when the LLM finds a date in the text. An undated
+        fact would pass every as-of filter, so a paper claim would appear to have been
+        known before the paper existed. Default it to the episode's reference time
+        (publication date for papers, creation time otherwise).
+        """
+        undated = [e for e in edges if e.valid_at is None]
+        for edge in undated:
+            edge.valid_at = reference_time
+            await edge.save(self._graphiti.driver)
+        if undated:
+            logger.info(
+                "Defaulted valid_at to %s for %d undated facts",
+                reference_time.isoformat(),
+                len(undated),
+            )
 
     async def _find_episode_uuid(self, name: str) -> str | None:
         records = await self._query(_FIND_EPISODE_BY_NAME, name=name)

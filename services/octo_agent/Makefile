@@ -3,12 +3,16 @@
 
 SHELL := /bin/bash
 .SHELLFLAGS := -euo pipefail -c
-VENV := ~/venvs/ai_cosc_orchestrator
+VENV := $(HOME)/venvs/ai_cosc_orchestrator
 PYTHON := $(VENV)/bin/python
 PIP := $(VENV)/bin/pip
 PYTEST := $(VENV)/bin/pytest
-SRC_DIR := $(PWD)/src
-PYTHONPATH := $(SRC_DIR):$(PYTHONPATH)
+SRC_DIR := $(CURDIR)/src
+# src/ is the import root; ../common/src provides shared_library
+export PYTHONPATH := $(SRC_DIR):$(CURDIR)/../common/src:$(PYTHONPATH)
+RUFF := $(if $(wildcard $(VENV)/bin/ruff),$(VENV)/bin/ruff,ruff)
+COMPOSE := docker compose -f compose.yaml --profile agent
+LLM_MODEL ?= Qwen3.8-27B-UD-Q4_K_XL
 
 # Services
 OCR_URL ?= http://localhost:8002
@@ -55,7 +59,7 @@ install: venv ## Install dependencies
 
 .PHONY: install-test
 install-test: install ## Install test dependencies
-	@$(PIP) install -r requirements_test.txt
+	@$(PIP) install -q -r requirements_test.txt ruff==0.15.12
 	@echo "✓ Test dependencies installed"
 
 .PHONY: activate
@@ -80,34 +84,48 @@ pythonpath: ## Show PYTHONPATH
 
 .PHONY: test
 test: install-test ## Run all tests
-	@PYTHONPATH=$(PYTHONPATH) $(PYTEST) tests/ -v
+	@$(PYTEST) tests/
 
-# ---- Linting & Formatting --------------------------------------------------
+# ---- Linting & Formatting (ruff, per AGENTS.md) ------------------------------
 
 .PHONY: lint
-lint: install ## Run linting (flake8, mypy)
-	@$(PIP) install flake8 mypy
-	@PYTHONPATH=$(PYTHONPATH) flake8 src/ tests/ --max-line-length=100
-	@PYTHONPATH=$(PYTHONPATH) mypy src/ --ignore-missing-imports
+lint: ## Run ruff check
+	@$(RUFF) check src tests
 	@echo "✓ Linting passed"
 
+.PHONY: fmt
+fmt: ## Format with ruff and apply safe fixes
+	@$(RUFF) format src tests
+	@$(RUFF) check --fix src tests
+
 .PHONY: format
-format: install ## Format code with black
-	@$(PIP) install black
-	@PYTHONPATH=$(PYTHONPATH) black src/ tests/ --line-length=100
-	@echo "✓ Code formatted"
+format: fmt ## Alias for fmt
 
 .PHONY: format-check
-format-check: install ## Check code formatting
-	@$(PIP) install black
-	@PYTHONPATH=$(PYTHONPATH) black src/ tests/ --line-length=100 --check
-	@echo "✓ Formatting check passed"
+format-check: ## Check formatting with ruff
+	@$(RUFF) format --check src tests
+
+# ---- Docker -----------------------------------------------------------------
+# The orchestrator HTTP entrypoint (src/agent_loop.py) does not exist yet; the compose
+# service is behind the "agent" profile for that reason.
+
+.PHONY: build
+build: ## Build the orchestrator image
+	$(COMPOSE) build
+
+.PHONY: up
+up: ## Start the orchestrator container
+	$(COMPOSE) up -d
+
+.PHONY: down
+down: ## Stop the orchestrator container
+	$(COMPOSE) down
 
 # ---- Integration -----------------------------------------------------------
 
-.PHONY: run-agent
-run-agent: install ## Run agent loop (set TASK env var)
-	@PYTHONPATH=$(PYTHONPATH) $(PYTHON) -m src.agent_loop --task "$(TASK)"
+.PHONY: run-solver
+run-solver: install ## Run the solver CLI (usage: make run-solver ARGS="--help")
+	@$(PYTHON) src/solver.py $(ARGS)
 
 
 .PHONY: test-ocr
@@ -127,7 +145,7 @@ test-llm: install ## Test LLM service (integration)
 	@echo "$(LLM_URL)/v1/chat/completions"
 	@tmp_body="$$(mktemp)"; tmp_hdr="$$(mktemp)"; \
 	payload="$$(jq -n \
-	  --arg model "Qwen3.6-27B-UD-Q5_K_XL" \
+	  --arg model "$(LLM_MODEL)" \
 	  --arg msg "Reply with exactly one word: pong" \
 	  '{model:$$model,messages:[{role:"user",content:$$msg}],temperature:0,max_tokens:64,stream:false}')" ; \
 	code="$$(curl -sS --connect-timeout 2 --max-time 180 \

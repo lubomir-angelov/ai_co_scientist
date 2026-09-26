@@ -23,19 +23,24 @@ curl -L -o models/embeddings/Qwen3-Embedding-0.6B-Q8_0.gguf \
   https://huggingface.co/Qwen/Qwen3-Embedding-0.6B-GGUF/resolve/main/Qwen3-Embedding-0.6B-Q8_0.gguf
 
 make memory-build
-make memory-up        # falkordb + embeddings + memory (starts the llm stack too)
+make memory-up        # falkordb + embeddings + memory
+make llm-up           # needed for ingestion (Qwen thinking off in the stack)
 make health
 ```
 
-Ingesting needs the LLM to be up, because Graphiti calls it for every episode. Search only
+Or run this service on its own with `make -C services/memory up`. It shares the
+`ai-co-scientist-network` network, so a separately started llm service is reachable.
+
+Ingesting needs the LLM to be up, because Graphiti calls it for every episode. In a live
+test on an RTX 5090 (27B Q4, thinking off), each chunk took about 20–30 s. Search only
 needs FalkorDB and the embeddings service.
 
 For local development without Docker for the service itself:
 
 ```bash
 cd services/memory
-make install          # into your active venv
-make run              # starts FalkorDB in Docker, runs uvicorn with --reload on :8005
+make install          # creates services/memory/.venv
+make run              # starts falkordb + embeddings via compose, runs uvicorn --reload on :8005
 make test             # unit tests; no FalkorDB, LLM or embeddings needed
 ```
 
@@ -93,7 +98,9 @@ curl -s localhost:8005/v1/memory/facts/changes -H 'content-type: application/jso
 ### Semantics
 
 - **Temporal facts.** Paper facts become valid at the paper's `published_at`; other episodes
-  at their `created_at`, or now. When a newer episode contradicts a fact, Graphiti sets
+  at their `created_at`, or now. The full publication date is included in the text the LLM
+  sees. Any fact it still returns without a date gets the episode's reference time, so that
+  as-of queries never surface a claim before its paper existed. When a newer episode contradicts a fact, Graphiti sets
   `invalid_at` rather than deleting it. `search` hides invalidated facts unless
   `include_invalidated` is set.
 - **Provenance.** Each `MemoryFact` carries `episodes` and `source_kinds`

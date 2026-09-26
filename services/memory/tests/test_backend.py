@@ -47,7 +47,9 @@ def make_graphiti(existing_episode: str | None = None, kinds: list[dict] | None 
     graphiti.driver.execute_query = AsyncMock(side_effect=execute_query)
     graphiti.add_episode = AsyncMock(
         return_value=SimpleNamespace(
-            episode=SimpleNamespace(uuid="ep-new"), nodes=[1, 2, 3], edges=[1, 2]
+            episode=SimpleNamespace(uuid="ep-new"),
+            nodes=[1, 2, 3],
+            edges=[SimpleNamespace(valid_at=PUBLISHED) for _ in range(2)],
         )
     )
     graphiti.search = AsyncMock(return_value=[])
@@ -280,3 +282,31 @@ async def test_graphiti_is_built_lazily_and_init_is_retryable() -> None:
         await backend.init()
     await backend.init()
     assert built == [1]
+
+
+async def test_undated_facts_default_to_reference_time() -> None:
+    graphiti = make_graphiti()
+    dated = MagicMock(valid_at=datetime(2018, 1, 1, tzinfo=UTC), save=AsyncMock())
+    undated = MagicMock(valid_at=None, save=AsyncMock())
+    graphiti.add_episode.return_value = SimpleNamespace(
+        episode=SimpleNamespace(uuid="ep"), nodes=[], edges=[dated, undated]
+    )
+    backend = await ready_backend(graphiti)
+
+    await backend.add_paper_section(
+        PaperSectionEpisodeIn(
+            paper=PAPER, section_name="Results", section_index=0, chunk_index=0, text="Q = 1e6"
+        )
+    )
+
+    assert undated.valid_at == PUBLISHED
+    undated.save.assert_awaited_once_with(graphiti.driver)
+    assert dated.valid_at == datetime(2018, 1, 1, tzinfo=UTC)
+    dated.save.assert_not_awaited()
+
+
+def test_paper_header_uses_full_publication_date() -> None:
+    from memory_service.graphiti_paper_backend import _paper_header
+
+    assert "Published: 2021-05-01" in _paper_header(PAPER)
+    assert "Published: 2020" in _paper_header(PaperMeta(paper_id="p", title="t", year=2020))

@@ -1,2 +1,6 @@
- pytest==8.4.2
- httpx==0.28.1
+pytest==8.4.2
+httpx==0.28.1
+# Unit tests stub torch/transformers/pdf2image (tests/conftest.py); these are the
+# light dependencies needed to import and exercise the FastAPI app.
+fastapi==0.115.4
+pillow
