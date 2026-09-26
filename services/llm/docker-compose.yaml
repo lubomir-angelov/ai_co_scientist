@@ -18,12 +18,12 @@ services:
       - /models/Qwen3.8-27B-UD-Q4_K_XL/Qwen3.8-27B-UD-Q4_K_XL.gguf
 
       # MTP sidecar
-      - --model-draft
-      - /models/Qwen3.8-27B-UD-Q4_K_XL/mtp-Qwen3.8-27B-Q4_0.gguf
+      #- --model-draft
+      #- /models/Qwen3.8-27B-UD-Q4_K_XL/mtp-Qwen3.8-27B-Q4_0.gguf
 
       # Vision projector
-      - --mmproj
-      - /models/Qwen3.8-27B-UD-Q4_K_XL/mmproj-F16.gguf
+      #- --mmproj
+      #- /models/Qwen3.8-27B-UD-Q4_K_XL/mmproj-F16.gguf
 
       # Runtime settings
       - --n-gpu-layers
