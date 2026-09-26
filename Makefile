@@ -9,10 +9,12 @@ PY_SERVICES := common memory ocr ocr_mcp octo_agent
 COMPOSE_SERVICES := llm ocr ocr_mcp memory octo_agent
 
 LLM_API_KEY ?= local-llm
+export LLM_API_KEY
 
 .PHONY: help up down build restart logs ps health install test lint format \
         agent-up agent-down llm-up llm-down ocr-up ocr-down ocr-mcp-up ocr-mcp-down \
-        ocr-mcp-build memory-up memory-down memory-build
+        ocr-mcp-build memory-up memory-down memory-build \
+        papers-ocr papers-ingest papers-status
 
 help:
 	@echo "Stack (root docker-compose.yml; Qwen thinking off unless LLM_REASONING=on):"
@@ -32,6 +34,11 @@ help:
 	@echo "  make test              - run every service's unit tests; fails if any fails"
 	@echo "  make lint              - ruff check services/"
 	@echo "  make format            - ruff format services/"
+	@echo ""
+	@echo "Paper ingestion (two-phase, resumable; swaps the OCR/LLM GPU tenant for you):"
+	@echo "  make papers-ocr INPUT_DIR=... [EXCLUDE='a.pdf b.pdf']  - Phase 1: OCR every PDF"
+	@echo "  make papers-ingest                                    - Phase 2: metadata + memory ingest"
+	@echo "  make papers-status                                    - show per-paper state"
 
 # ---- Stack -------------------------------------------------------------------
 
@@ -126,3 +133,19 @@ lint:
 
 format:
 	ruff format services/
+
+# ---- Paper ingestion (sequences the GPU tenant on the host, then delegates) --------------
+
+papers-ocr:     ## Phase 1: stop LLM, start OCR, OCR all PDFs (INPUT_DIR=..., EXCLUDE=...)
+	$(MAKE) llm-down
+	$(MAKE) ocr-up
+	$(MAKE) -C services/octo_agent papers-ocr
+
+papers-ingest:  ## Phase 2: stop OCR, start LLM + memory, extract metadata and ingest
+	$(MAKE) ocr-down
+	$(MAKE) llm-up
+	$(MAKE) memory-up
+	$(MAKE) -C services/octo_agent papers-ingest
+
+papers-status:  ## Show per-paper ingestion state
+	$(MAKE) -C services/octo_agent papers-status

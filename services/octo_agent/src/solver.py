@@ -205,7 +205,6 @@ def construct_solver(llm_engine_name : str = "Corianas/DeepSeek-R1-Distill-Qwen-
 
     # Instantiate Planner
     planner = Planner(
-        llm_engine_name=llm_engine_name,
         toolbox_metadata=initializer.toolbox_metadata,
         available_tools=initializer.available_tools,
         verbose=verbose,

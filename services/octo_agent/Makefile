@@ -175,6 +175,33 @@ test-tools-integration: install ## Run tools integration tests (LLM + OCR)
 	@$(MAKE) test-ocr
 
 
+# ---- Paper ingestion (two phases; the GPU tenant is swapped by the ROOT Makefile) ----
+INGEST_WORK_DIR ?= $(HOME)/ai_cosc_paper_ingest
+# 3 h per PDF: 44 s/page measured -> ~245 pages; largest corpus PDF is 110 pages.
+OCR_TIMEOUT_SECONDS ?= 10800
+# 120 s/page measured (12 pages -> 24 min) x2.5 headroom; ingest timeout = this x page count.
+INGEST_SECONDS_PER_PAGE ?= 300
+# How long to wait for the required GPU tenant / memory to become ready after `up`.
+READY_TIMEOUT_SECONDS ?= 900
+EXCLUDE ?=
+
+.PHONY: papers-ocr
+papers-ocr: install ## Phase 1: OCR every PDF in INPUT_DIR into INGEST_WORK_DIR (LLM must be down)
+	$(if $(INPUT_DIR),,$(error INPUT_DIR is required))
+	@$(PYTHON) -m paper_ingest ocr --input-dir "$(INPUT_DIR)" --work-dir "$(INGEST_WORK_DIR)" \
+	  $(foreach f,$(EXCLUDE),--exclude '$(f)') \
+	  --ocr-timeout-seconds $(OCR_TIMEOUT_SECONDS) --ready-timeout-seconds $(READY_TIMEOUT_SECONDS)
+
+.PHONY: papers-ingest
+papers-ingest: install ## Phase 2: metadata + memory ingest from the OCR cache (OCR must be down)
+	@$(PYTHON) -m paper_ingest ingest --work-dir "$(INGEST_WORK_DIR)" \
+	  --ingest-seconds-per-page $(INGEST_SECONDS_PER_PAGE) --ready-timeout-seconds $(READY_TIMEOUT_SECONDS)
+
+.PHONY: papers-status
+papers-status: ## Show per-paper ingestion state
+	@$(PYTHON) -m paper_ingest status --work-dir "$(INGEST_WORK_DIR)"
+
+
 # ---- Maintenance -----------------------------------------------------------
 
 .PHONY: clean

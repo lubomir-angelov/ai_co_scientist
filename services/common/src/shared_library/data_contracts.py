@@ -24,6 +24,19 @@ class OCRResponse(BaseModel):
     metadata: dict
 
 
+# The one shared definition of OCR page-section names: the OCR server produces them, and
+# paper_ingest.phases.page_sections consumes them. Both sides import this instead of each
+# keeping its own copy of the literal (CLAUDE.md §6).
+OCR_FULLTEXT_SECTION = "FullText"
+
+
+def ocr_page_section_name(page_number: int) -> str:
+    """The OCRSection.name for a 1-indexed OCR page."""
+    if page_number < 1:
+        raise ValueError(f"page_number must be >= 1, got {page_number}")
+    return f"Page {page_number}"
+
+
 # memory
 class FactTriple(BaseModel):
     subject: str

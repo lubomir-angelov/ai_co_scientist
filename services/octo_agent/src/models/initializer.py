@@ -3,15 +3,9 @@ import sys
 import importlib
 import inspect
 import traceback
-from typing import Dict, Any, List, Tuple
-import time
-
-import os
-import sys
-import importlib
-import inspect
-import traceback
 from typing import Dict, Any, List, Optional
+
+from runtime_config import RuntimeConfig
 
 
 class Initializer:
@@ -30,7 +24,7 @@ class Initializer:
         self.enabled_tools = enabled_tools or []
         self.load_all = self.enabled_tools == ["all"]
         self.model_string = model_string or ""
-        self.llm_model_id = self._resolve_llm_model_id()
+        self.llm_model_id = RuntimeConfig.from_env().llm_model
         self.verbose = verbose
         self.vllm_config_path = vllm_config_path
 
@@ -153,32 +147,6 @@ class Initializer:
         print("✅ Finished setting up tools.")
         print(f"✅ Total number of final available tools: {len(self.available_tools)}")
         print(f"✅ Final available tools: {self.available_tools}")
-
-    def _resolve_llm_model_id(self) -> str:
-        # Prefer explicit env var
-        model_id = (os.environ.get("LLM_MODEL_ID") or os.environ.get("LLM_MODEL") or "").strip()
-        if model_id:
-            return model_id
-
-        # If model_string already looks like a model id, accept it
-        s = (self.model_string or "").strip()
-        if "/" in s and s.lower() not in {"local-llm", "local", "vllm"}:
-            return s
-
-        # Fallback: ask the server for the first model
-        base_url = (os.environ.get("LLM_BASE_URL") or "http://localhost:8000/v1").rstrip("/")
-        api_key = (os.environ.get("LLM_API_KEY") or "local-llm").strip()
-        try:
-            headers = {"Authorization": f"Bearer {api_key}"}
-            r = httpx.get(f"{base_url}/models", headers=headers, timeout=10.0)
-            r.raise_for_status()
-            data = r.json()
-            return data["data"][0]["id"]
-        except Exception:
-            # Last resort: keep a known-good default
-            return "Corianas/DeepSeek-R1-Distill-Qwen-14B-AWQ"
-
-
 
 if __name__ == "__main__":
     enabled_tools = ["Document_Parser_OCR_Tool"]

@@ -1,57 +1,37 @@
 """
-Engine factory - adapted from octotools
-Creates LLM engine instances
-For our services, we default to ChatLocalLLM (via gateway)
+Engine factory - adapted from octotools.
+Creates the local LLM engine instance from RuntimeConfig.
 """
 
-from typing import Any
+from __future__ import annotations
 
-from engine.local_llm import ChatLocalLLM  # noqa: F401
+from engine.local_llm import ChatLocalLLM
+from runtime_config import RuntimeConfig
 
 
-def create_llm_engine(
-    model_string: str = "Corianas/DeepSeek-R1-Distill-Qwen-14B-AWQ", # default to qwen
-    use_cache: bool = False,
-    is_multimodal: bool = True,
-    base_url: str = "http://localhost:8000/v1",
-    api_key: str = "local-llm", # Default to local llm
-    **kwargs
-) -> Any:
+def create_llm_engine(*, is_multimodal: bool, use_cache: bool = False, **kwargs) -> ChatLocalLLM:
     """
-    Factory function to create LLM engine instance.
-    
-    For the orchestrator service, we primarily use ChatLocalLLM (gateway).
-    Can be extended to support other engines from vendor/octotools.
-    
+    Factory function to create the local LLM engine instance.
+
+    Model, base URL, API key and request timeout come from ``RuntimeConfig.from_env()`` — the
+    one source of that configuration — so every caller talks to the same gateway with the same
+    model id and timeout.
+
     Args:
-        model_string: Model identifier (e.g., "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B")
-        use_cache: Enable caching
-        is_multimodal: Support multimodal input
-        base_url: LLM Gateway base URL
-        api_key: API key for authentication
-        **kwargs: Additional arguments
-    
+        is_multimodal: Support multimodal input.
+        use_cache: Enable caching.
+        **kwargs: Passed through to ``ChatLocalLLM``.
+
     Returns:
-        LLM engine instance
+        ChatLocalLLM engine instance.
     """
-    
-    # Default to local LLM gateway
-    if "local" in model_string.lower() or "vllm" in model_string.lower():
-        from .local_llm import ChatLocalLLM
-        return ChatLocalLLM(
-            model_string=model_string,
-            base_url=base_url,
-            api_key=api_key,
-            use_cache=use_cache,
-            is_multimodal=is_multimodal,
-            **kwargs
-        )
-    
-    # For other models, could import from vendor engines
-    # This allows fallback to vendor implementations if needed
-    else:
-        raise ValueError(
-            f"Engine {model_string} not supported in orchestrator. "
-            "For now, use 'local' or 'vllm' prefix for local LLM gateway. "
-            "Other engines can be added from vendor/octotools/engine/"
-        )
+    cfg = RuntimeConfig.from_env()
+    return ChatLocalLLM(
+        model_string=cfg.llm_model,
+        base_url=cfg.llm_base_url,
+        api_key=cfg.llm_api_key,
+        is_multimodal=is_multimodal,
+        timeout_s=cfg.llm_request_timeout_seconds,
+        use_cache=use_cache,
+        **kwargs,
+    )
