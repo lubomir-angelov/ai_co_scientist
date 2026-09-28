@@ -177,9 +177,9 @@ test-tools-integration: install ## Run tools integration tests (LLM + OCR)
 
 # ---- Paper ingestion (two phases; the GPU tenant is swapped by the ROOT Makefile) ----
 INGEST_WORK_DIR ?= $(HOME)/ai_cosc_paper_ingest
-# 3 h per PDF: 44 s/page measured -> ~245 pages; largest corpus PDF is 110 pages.
+# 3 h per PDF: 37 s/page measured -> ~290 pages; largest corpus PDF is 110 pages.
 OCR_TIMEOUT_SECONDS ?= 10800
-# 120 s/page measured (12 pages -> 24 min) x2.5 headroom; ingest timeout = this x page count.
+# 134 s/page measured x2.5 headroom; ingest timeout = this x page count.
 INGEST_SECONDS_PER_PAGE ?= 300
 # How long to wait for the required GPU tenant / memory to become ready after `up`.
 READY_TIMEOUT_SECONDS ?= 900

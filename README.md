@@ -85,36 +85,39 @@ make papers-ingest
 make papers-status
 ```
 
-**RECOMMENDED — `nohup`.** Runs both phases unattended and survives closing the terminal:
+**RECOMMENDED — `nohup`.** Runs both phases unattended and survives closing the terminal.
+Run this from the repo root (it invokes `make papers-all`, a root Makefile target):
 
 ```bash
 mkdir -p ~/ai_cosc_paper_ingest
-setsid nohup sh -c 'make papers-ocr INPUT_DIR="/path/to/pdfs" EXCLUDE="skip-this.pdf"; make papers-ingest' \
+setsid nohup sh -c 'echo $$ > ~/ai_cosc_paper_ingest/run.pid; exec make papers-all INPUT_DIR="/path/to/pdfs" EXCLUDE="skip-this.pdf"' \
   > ~/ai_cosc_paper_ingest/run.log 2>&1 &
-echo $! > ~/ai_cosc_paper_ingest/run.pid
 ```
 
-The `;` between the two `make` calls is deliberate, not `&&`: `papers-ocr` exits non-zero if
-even one paper failed OCR, and phase 2 should still ingest everything that did OCR
-successfully — failed papers are simply retried on the next run.
+`$$` is expanded by the `sh` that `setsid` starts as the new session/process-group leader, and
+`exec` replaces that `sh` with `make` in place rather than forking a child — so `run.pid` ends
+up holding the PGID of the whole run (`make` and everything it launches), not a throwaway
+wrapper PID. `papers-all` runs phase 1 then phase 2 in one invocation and continues to phase 2
+even if some papers failed OCR — they are simply retried on a later run.
 
 - Monitor: `tail -f ~/ai_cosc_paper_ingest/run.log` or `make papers-status`. Per-phase logs
   also land in `~/ai_cosc_paper_ingest/logs/`.
 - Stop: `kill -- -"$(cat ~/ai_cosc_paper_ingest/run.pid)"` — the leading `-` targets the whole
-  process group `setsid` started, so the `make` and Python batch under it stop too; a plain
-  `kill <pid>` would only stop the outer shell and leave them running. Resume: re-run the same
-  command — papers already done are skipped. Check nothing was left behind:
-  `ps -o pid,args -g "$(cat ~/ai_cosc_paper_ingest/run.pid)"` (no output means the group is
-  gone). Stopping mid-paper may leave the OCR/memory service still processing that request
-  server-side — a rerun re-sends it, and memory skips chunks already stored.
+  process group, so `make` and the Python batch under it stop too; a plain `kill <pid>` would
+  only stop the outer shell and leave them running. Resume: re-run the same command — papers
+  already done are skipped. Launching a second run while one is still active now fails
+  immediately with a lock error naming the work dir, instead of silently double-processing it.
+  Check nothing was left behind: `ps -o pid,args -g "$(cat ~/ai_cosc_paper_ingest/run.pid)"` —
+  once the group is gone this prints only the header line, no process rows. Stopping mid-paper
+  may leave the OCR/memory service still processing that request server-side — a rerun re-sends
+  it, and memory skips chunks already stored.
 
 **Alternative — `tmux`.** Prefer this when you want to watch the live output instead of
 tailing a log:
 
 ```bash
 tmux new -s ingest
-# inside the session: make papers-ocr INPUT_DIR="/path/to/pdfs" EXCLUDE='skip-this.pdf'
-#                      make papers-ingest
+# inside the session: make papers-all INPUT_DIR="/path/to/pdfs" EXCLUDE='skip-this.pdf'
 # detach: Ctrl-b d
 tmux attach -t ingest   # reattach later
 ```

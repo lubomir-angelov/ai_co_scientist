@@ -74,25 +74,30 @@ def _run_ocr(args: argparse.Namespace, cfg: RuntimeConfig) -> int:
     identities = discover(args.input_dir, exclude=args.exclude)
     logger.info("Discovered %d PDF(s) in %s", len(identities), args.input_dir)
 
-    require_down("LLM gateway", f"{cfg.llm_base_url}/models", "llm-down")
-    wait_ocr_ready(cfg.ocr_base_url, args.ready_timeout_seconds)
-
+    # Locked for the whole phase, including preflight: a second run started against the same
+    # work dir must fail fast on the lock, not spend `ready_timeout_seconds` polling first.
     store = StateStore(args.work_dir)
     tool = Document_Parser_OCR_Tool()
-    summary = run_ocr_phase(identities, tool, store, args.ocr_timeout_seconds)
+    with store.exclusive_lock():
+        require_down("LLM gateway", f"{cfg.llm_base_url}/models", "llm-down")
+        wait_ocr_ready(cfg.ocr_base_url, args.ready_timeout_seconds)
+        summary = run_ocr_phase(identities, tool, store, args.ocr_timeout_seconds)
     logger.info("Phase 1 (OCR) finished:\n%s", render_summary(summary))
     return summary.exit_code
 
 
 def _run_ingest(args: argparse.Namespace, cfg: RuntimeConfig) -> int:
-    require_down("OCR", f"{cfg.ocr_base_url}/healthz", "ocr-down")
-    wait_llm_serving(cfg.llm_base_url, cfg.llm_api_key, cfg.llm_model, args.ready_timeout_seconds)
-    wait_memory_ready(cfg.memory_base_url, args.ready_timeout_seconds)
-
+    # Locked for the whole phase, including preflight — see _run_ocr.
     store = StateStore(args.work_dir)
     engine = create_llm_engine(is_multimodal=False)
     memory_tool = Memory_Graph_Tool()
-    summary = run_ingest_phase(engine, memory_tool, store, args.ingest_seconds_per_page)
+    with store.exclusive_lock():
+        require_down("OCR", f"{cfg.ocr_base_url}/healthz", "ocr-down")
+        wait_llm_serving(
+            cfg.llm_base_url, cfg.llm_api_key, cfg.llm_model, args.ready_timeout_seconds
+        )
+        wait_memory_ready(cfg.memory_base_url, args.ready_timeout_seconds)
+        summary = run_ingest_phase(engine, memory_tool, store, args.ingest_seconds_per_page)
     logger.info("Phase 2 (ingest) finished:\n%s", render_summary(summary))
     return summary.exit_code
 

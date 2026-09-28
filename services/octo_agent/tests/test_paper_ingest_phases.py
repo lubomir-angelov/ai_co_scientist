@@ -267,7 +267,9 @@ def test_blocked_when_ocr_failed(tmp_path: Path) -> None:
         )
     )
     engine = FakeEngine(
-        Page1TitleAndDate(title="T", publication_date_text=None, year=None, month=None, day=None)
+        Page1TitleAndDate(
+            title="T", publication_date_text=None, year=None, month=None, month_text=None, day=None
+        )
     )
     memory_tool = FakeMemoryTool({})
 
@@ -289,7 +291,12 @@ def test_meta_is_persisted_before_ingest_and_reused_on_retry(tmp_path: Path) -> 
 
     engine1 = FakeEngine(
         Page1TitleAndDate(
-            title="Hello Title", publication_date_text=None, year=None, month=None, day=None
+            title="Hello Title",
+            publication_date_text=None,
+            year=None,
+            month=None,
+            month_text=None,
+            day=None,
         )
     )
     memory_tool_fail = FakeMemoryTool(
@@ -309,6 +316,7 @@ def test_meta_is_persisted_before_ingest_and_reused_on_retry(tmp_path: Path) -> 
             publication_date_text=None,
             year=None,
             month=None,
+            month_text=None,
             day=None,
         )
     )
@@ -345,7 +353,12 @@ def test_ingest_timeout_is_seconds_per_page_times_page_count(tmp_path: Path) -> 
     )
     engine = FakeEngine(
         Page1TitleAndDate(
-            title="Title", publication_date_text=None, year=None, month=None, day=None
+            title="Title",
+            publication_date_text=None,
+            year=None,
+            month=None,
+            month_text=None,
+            day=None,
         )
     )
     memory_tool = FakeMemoryTool(
@@ -381,7 +394,12 @@ def test_zero_episodes_is_a_failure_that_does_not_abort_the_run(tmp_path: Path) 
         )
     engine = FakeEngine(
         Page1TitleAndDate(
-            title="Title", publication_date_text=None, year=None, month=None, day=None
+            title="Title",
+            publication_date_text=None,
+            year=None,
+            month=None,
+            month_text=None,
+            day=None,
         )
     )
     memory_tool = FakeMemoryTool(
@@ -415,7 +433,9 @@ def test_missing_cache_for_done_ocr_raises(tmp_path: Path) -> None:
     store = StateStore(tmp_path)
     store.save(_ocr_done_state("file:a", "/papers/a.pdf"))
     engine = FakeEngine(
-        Page1TitleAndDate(title="T", publication_date_text=None, year=None, month=None, day=None)
+        Page1TitleAndDate(
+            title="T", publication_date_text=None, year=None, month=None, month_text=None, day=None
+        )
     )
     memory_tool = FakeMemoryTool({})
 
@@ -434,7 +454,12 @@ def test_identity_drift_between_state_and_source_file_raises(tmp_path: Path) -> 
     )
     engine = FakeEngine(
         Page1TitleAndDate(
-            title="Title", publication_date_text=None, year=None, month=None, day=None
+            title="Title",
+            publication_date_text=None,
+            year=None,
+            month=None,
+            month_text=None,
+            day=None,
         )
     )
     memory_tool = FakeMemoryTool({})
@@ -456,7 +481,12 @@ def test_eta_is_page_based_across_papers_of_different_sizes(tmp_path: Path) -> N
         )
     engine = FakeEngine(
         Page1TitleAndDate(
-            title="Title", publication_date_text=None, year=None, month=None, day=None
+            title="Title",
+            publication_date_text=None,
+            year=None,
+            month=None,
+            month_text=None,
+            day=None,
         )
     )
     memory_tool = FakeMemoryTool(
@@ -506,7 +536,12 @@ def test_non_domain_exception_in_ingest_propagates_without_being_recorded(tmp_pa
     )
     engine = FakeEngine(
         Page1TitleAndDate(
-            title="Title", publication_date_text=None, year=None, month=None, day=None
+            title="Title",
+            publication_date_text=None,
+            year=None,
+            month=None,
+            month_text=None,
+            day=None,
         )
     )
 

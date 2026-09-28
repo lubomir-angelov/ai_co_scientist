@@ -14,7 +14,7 @@ export LLM_API_KEY
 .PHONY: help up down build restart logs ps health install test lint format \
         agent-up agent-down llm-up llm-down ocr-up ocr-down ocr-mcp-up ocr-mcp-down \
         ocr-mcp-build memory-up memory-down memory-build \
-        papers-ocr papers-ingest papers-status
+        papers-ocr papers-ingest papers-status papers-all
 
 help:
 	@echo "Stack (root docker-compose.yml; Qwen thinking off unless LLM_REASONING=on):"
@@ -38,6 +38,7 @@ help:
 	@echo "Paper ingestion (two-phase, resumable; swaps the OCR/LLM GPU tenant for you):"
 	@echo "  make papers-ocr INPUT_DIR=... [EXCLUDE='a.pdf b.pdf']  - Phase 1: OCR every PDF"
 	@echo "  make papers-ingest                                    - Phase 2: metadata + memory ingest"
+	@echo "  make papers-all INPUT_DIR=... [EXCLUDE='a.pdf b.pdf']  - Phase 1 then phase 2, one invocation"
 	@echo "  make papers-status                                    - show per-paper state"
 
 # ---- Stack -------------------------------------------------------------------
@@ -146,6 +147,13 @@ papers-ingest:  ## Phase 2: stop OCR, start LLM + memory, extract metadata and i
 	$(MAKE) llm-up
 	$(MAKE) memory-up
 	$(MAKE) -C services/octo_agent papers-ingest
+
+# The leading `-` ignores papers-ocr's exit status: it exits non-zero when even one paper
+# failed OCR, and phase 2 must still ingest everything that did OCR successfully — failed
+# papers are simply retried on a later run. papers-all's own exit status is papers-ingest's.
+papers-all:     ## Phase 1 then phase 2 in one invocation (INPUT_DIR=..., EXCLUDE=...)
+	-$(MAKE) papers-ocr INPUT_DIR="$(INPUT_DIR)" EXCLUDE="$(EXCLUDE)"
+	$(MAKE) papers-ingest
 
 papers-status:  ## Show per-paper ingestion state
 	$(MAKE) -C services/octo_agent papers-status
