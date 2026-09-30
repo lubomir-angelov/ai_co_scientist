@@ -2,8 +2,10 @@
 # Reference: https://github.com/octotools/octotools/blob/main/octotools/engine/base.py
 
 import hashlib
-import diskcache as dc
 from abc import ABC, abstractmethod
+
+import diskcache as dc
+
 
 class EngineLM(ABC):
     system_prompt: str = "You are a helpful, creative, and smart assistant."
@@ -12,7 +14,7 @@ class EngineLM(ABC):
     def generate(self, prompt, system_prompt=None, **kwargs):
         pass
 
-    def __call__(self, *args, **kwargs):
+    def __call__(self, *args, **kwargs):  # noqa: B027 - optional hook, subclasses override
         pass
 
 

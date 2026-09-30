@@ -1,0 +1,89 @@
+# Memory service: Graphiti temporal knowledge graph on FalkorDB, with a local
+# embeddings server. Entity/fact extraction calls the llm-gateway service.
+# Standalone: make -C services/memory up   (run the llm service too for ingestion)
+name: ai-co-memory
+
+services:
+  falkordb:
+    image: falkordb/falkordb-server:v4.20.7
+    environment:
+      REDIS_ARGS: --appendonly yes
+      # Image default TIMEOUT is 1000 ms; hybrid graph search on a growing graph needs more.
+      FALKORDB_ARGS: MAX_QUEUED_QUERIES 25 TIMEOUT 10000 RESULTSET_SIZE 10000
+    volumes:
+      - falkordb-data:/var/lib/falkordb/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  # Small GGUF embedding model on CPU (keeps GPU memory for the main LLM)
+  embeddings:
+    image: ghcr.io/ggml-org/llama.cpp:server-b10830
+    command:
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8080"
+      - --model
+      - /models/${EMBEDDING_MODEL_FILE:-Qwen3-Embedding-0.6B-Q8_0.gguf}
+      - --alias
+      - ${EMBEDDING_MODEL:-Qwen3-Embedding-0.6B}
+      - --embeddings
+      - --pooling
+      - last
+      - --ctx-size
+      - "8192"
+      - --ubatch-size
+      - "8192"
+    volumes:
+      - ../../models/embeddings:/models:ro
+    ports:
+      - "8006:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8080/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+
+  memory:
+    build:
+      context: ../..
+      dockerfile: services/memory/Dockerfile
+    environment:
+      MEMORY_FALKORDB_HOST: falkordb
+      MEMORY_FALKORDB_PORT: "6379"
+      MEMORY_GRAPH_NAME: ${MEMORY_GRAPH_NAME:-photonic_memory}
+      MEMORY_LLM_BASE_URL: ${MEMORY_LLM_BASE_URL:-http://llm-gateway:8000/v1}
+      MEMORY_LLM_API_KEY: ${LLM_API_KEY:-local-llm}
+      # Must match the model id served by the llm service (its --alias).
+      MEMORY_LLM_MODEL: ${MEMORY_LLM_MODEL:-Qwen3.8-27B-UD-Q4_K_XL}
+      MEMORY_LLM_STRUCTURED_OUTPUT: ${MEMORY_LLM_STRUCTURED_OUTPUT:-json_schema}
+      MEMORY_EMBEDDING_BASE_URL: http://embeddings:8080/v1
+      MEMORY_EMBEDDING_MODEL: ${EMBEDDING_MODEL:-Qwen3-Embedding-0.6B}
+      MEMORY_EMBEDDING_DIM: ${EMBEDDING_DIM:-1024}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      GRAPHITI_TELEMETRY_ENABLED: "false"
+    ports:
+      - "8005:8005"
+    # llm-gateway lives in another compose file; the service tolerates it being down
+    # (requests fail with 502 model_unavailable until it is up).
+    depends_on:
+      falkordb:
+        condition: service_healthy
+      embeddings:
+        condition: service_healthy
+
+volumes:
+  falkordb-data:
+    # Fixed name so standalone and full-stack runs share the same graph data.
+    name: ai-co-scientist-falkordb-data
+
+networks:
+  default:
+    # Shared by every service compose file, so standalone services reach each other by name.
+    name: ai-co-scientist-network

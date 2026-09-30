@@ -1,25 +1,44 @@
-# deep_seek_ocr
-A DeepSek OCR server as a tool to OctoTools.
+# OCR service
 
-Running within a docker container to support a cuda:12.8.1 image and no vllm_cu118 as it's not yet compatible with more recent cuda.
+A [DeepSeek-OCR](https://github.com/deepseek-ai/DeepSeek-OCR) FastAPI server for PDFs and
+images. It runs in a CUDA 12.8 container, and the model is downloaded into the image at build
+time (the image is about 70 GB).
 
-# export local env vars
+- `GET /healthz`: `{"status", "service": "ocr", "ready"}`. `ready` means the model is loaded.
+- `POST /ocr/extract`: takes an `OCRRequest` `{doc_id, content_b64}` (PDF or image bytes)
+  and returns an `OCRResponse` with a `FullText` section, one section per page, and page
+  metadata.
+
+Contracts live in `services/common/src/shared_library/data_contracts.py`.
+
+## Running
+
 ```bash
-export BASE_IMAGE="nvidia/cuda:12.8.1-cudnn-devel-ubuntu22.04"
-export IMAGE_TAG="deepseek-ocr-service"
+cd services/ocr
+make build     # docker image via compose.yaml (slow the first time)
+make up        # port 8002, GPU 0
+make health
+make down
 ```
 
-# build
+Or, from the repo root, `make ocr-up` / `make ocr-mcp-up` (OCR plus its MCP server).
+
+Example request (piped through `printf` so large PDFs don't exceed the argument-length limit):
+
 ```bash
-docker build \
-  --build-arg BASE_IMAGE="${BASE_IMAGE}" \
-  -t "${IMAGE_TAG}" .
+printf '{"doc_id":"paper-1","content_b64":"%s"}' "$(base64 -w0 paper.pdf)" \
+  | curl -s localhost:8002/ocr/extract -H 'Content-Type: application/json' -d @-
 ```
 
-# run
+## Development
+
 ```bash
-docker run -it --rm --gpus all \
-  -p 8000:8000 \
-  -v $PWD/shared:/workspace/shared \
-  "${IMAGE_TAG}"
+make install        # light .venv: FastAPI + test deps, no torch
+make test           # unit tests stub torch/transformers/pdf2image (tests/conftest.py)
+make lint
+make install-full   # adds the GPU runtime deps, needed for `make run`
+make run            # local uvicorn (needs a GPU and the model at /opt/models/deepseek-ocr)
 ```
+
+Torch is pinned to the stable 2.10.0 cu128 build in the `Dockerfile` (RTX 50xx needs CUDA 12.8).
+Page concurrency is `OCR_PAGE_CONCURRENCY` (default 1).

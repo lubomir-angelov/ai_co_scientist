@@ -1,6 +1,5 @@
 # octotools/tools/base.py
 
-from engine.local_llm import ChatLocalLLM
 
 class BaseTool:
     """

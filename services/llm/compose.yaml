@@ -1,10 +1,12 @@
+# LLM service: llama.cpp server + API-key gateway.
+# Standalone:  make -C services/llm up      (thinking on by default)
+# Full stack:  make up  (from repo root)    (thinking off, see compose.stack.yaml)
 name: ai-co-llm
 
 services:
   llm:
     #image: docker.io/gtonkov/llamacpp-turboquant:latest
     image: ghcr.io/ggml-org/llama.cpp:server-cuda12-b10830
-    container_name: ai-co-llm-llama-cpp
     restart: unless-stopped
 
     command:
@@ -16,6 +18,9 @@ services:
       # Main model
       - --model
       - /models/Qwen3.8-27B-UD-Q4_K_XL/Qwen3.8-27B-UD-Q4_K_XL.gguf
+      # Model id reported by /v1/models and expected in requests (memory uses it too)
+      - --alias
+      - Qwen3.8-27B-UD-Q4_K_XL
 
       # MTP sidecar
       #- --model-draft
@@ -37,9 +42,12 @@ services:
       - --spec-draft-n-max
       - "3"
 
-      # Replaces enable_thinking in --chat-template-kwargs
-      - --reasoning
-      - "on"
+      # Qwen thinking is controlled by LLAMA_ARG_REASONING (env below) so it can be
+      # switched without editing this file: LLM_REASONING=on|off|auto.
+      # Note: 'auto' (llama.cpp default) follows the Qwen template, i.e. thinking ON.
+      # A CLI flag would override the env var, so keep this commented out.
+      #- --reasoning
+      #- "on"
 
       # Use this for 256k context
       - --ctx-size
@@ -51,12 +59,14 @@ services:
       - "512"
 
       - -np
-      - "1"
+      - "4"
+      # Shared KV pool: any single request may use the full context (Graphiti prompts reach 45k+ tokens)
+      - --kv-unified
 
       - --cache-reuse
       - "256"
       - --cache-ram
-      - "20000"
+      - "4096"
 
       - --cache-type-k
       - q8_0
@@ -89,6 +99,7 @@ services:
 
     environment:
       LLAMA_LOG_LEVEL: info
+      LLAMA_ARG_REASONING: ${LLM_REASONING:-on}
 
     ports:
       - "8000:8080"
@@ -123,6 +134,16 @@ services:
       API_KEY: ${LLM_API_KEY:-local-llm}
     ports:
       - "9000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz', timeout=4)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
     depends_on:
       llm:
         condition: service_healthy
+
+networks:
+  default:
+    # Shared by every service compose file, so standalone services reach each other by name.
+    name: ai-co-scientist-network

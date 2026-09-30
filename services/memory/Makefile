@@ -1,115 +1,85 @@
-# services/memory/Makefile
+# services/memory/Makefile - Graphiti + FalkorDB temporal memory service
 
-# ---------- Basic config ----------
+PYTHON  ?= python3
+VENV    ?= .venv
+PY      := $(VENV)/bin/python
+RUFF    := $(if $(wildcard $(VENV)/bin/ruff),$(VENV)/bin/ruff,ruff)
+COMPOSE := docker compose -f compose.yaml
 
-BASE_IMAGE ?= python:3.11-slim
-IMAGE_TAG  ?= memory-service
+HOST_PORT ?= 8005
 
-CONTAINER_PORT ?= 8005
-HOST_PORT      ?= 8005
+# Local LLM / embeddings / FalkorDB as published on the host by the compose files
+MEMORY_LLM_BASE_URL       ?= http://localhost:9000/v1
+MEMORY_LLM_MODEL          ?= Qwen3.8-27B-UD-Q4_K_XL
+MEMORY_EMBEDDING_BASE_URL ?= http://localhost:8006/v1
 
-PYTHON    ?= python
-APP_MODULE := src.app:app
-HOST      := 0.0.0.0
-
-# FalkorDB config for local dev
-FALKORDB_IMAGE           ?= falkordb/falkordb:latest
-FALKORDB_CONTAINER_NAME  ?= falkordb-memory
-FALKORDB_PORT            ?= 6379
-
-# repo root (two levels up from services/memory)
-REPO_ROOT  := $(abspath $(PWD)/../..)
-SERVICE_DIR := services/memory
-
-# add these at the top of the Makefile
-PWD := $(shell pwd)
-# Adjust PYTHONPATH so local imports work if needed
-export PYTHONPATH := $(PWD):$(PWD)/../shared_library:$(PYTHONPATH)
-
-
-# ---------- Help ----------
+export PYTHONPATH := $(CURDIR)/src:$(CURDIR)/../common/src:$(PYTHONPATH)
 
 .PHONY: help
 help:
-	@echo "make install        - install memory service + shared_library into current venv"
-	@echo "make run            - start FalkorDB (docker) and run uvicorn locally on $(HOST):$(HOST_PORT)"
-	@echo "make run-falkordb   - start FalkorDB docker container only"
-	@echo "make docker-build   - build docker image for memory service"
-	@echo "make docker-run     - run docker container for memory service"
-	@echo "make test           - run pytest"
-	@echo "make fmt            - run ruff format + ruff check"
-
-
-# ---------- Install ----------
+	@echo "make install   - create $(VENV) with service, test and shared_library deps"
+	@echo "make test      - unit tests (no FalkorDB / LLM / embeddings needed)"
+	@echo "make lint      - ruff check"
+	@echo "make fmt       - ruff format + ruff check --fix"
+	@echo "make run       - run the API locally with reload (starts falkordb + embeddings via compose)"
+	@echo "make build     - build images (compose.yaml)"
+	@echo "make up / down - start / stop falkordb + embeddings + memory (compose.yaml)"
+	@echo "make logs / ps - compose logs / status"
+	@echo "make health    - query /health on localhost:$(HOST_PORT)"
 
 .PHONY: install
 install:
-	$(PYTHON) -m pip install -r requirements.txt
-	[ -f requirements_test.txt ] && $(PYTHON) -m pip install -r requirements_test.txt || true
-	@if [ -d "../common" ]; then \
-	  cd ../common && $(PYTHON) -m pip install -e . ; \
-	fi
-	# optional: install ruff for local formatting
-	$(PYTHON) -m pip install ruff
+	$(PYTHON) -m venv $(VENV)
+	$(PY) -m pip install -q --upgrade pip
+	$(PY) -m pip install -q -r ../common/requirements.txt -r requirements.txt -r requirements_test.txt ruff==0.15.12
 
-
-# ---------- FalkorDB (local, via Docker) ----------
-
-.PHONY: run-falkordb
-run-falkordb:
-	@echo "Ensuring FalkorDB container '$(FALKORDB_CONTAINER_NAME)' is running on port $(FALKORDB_PORT)..."
-	@if ! docker ps --format '{{.Names}}' | grep -q '^$(FALKORDB_CONTAINER_NAME)$$'; then \
-	  if docker ps -a --format '{{.Names}}' | grep -q '^$(FALKORDB_CONTAINER_NAME)$$'; then \
-	    echo "Starting existing FalkorDB container $(FALKORDB_CONTAINER_NAME)..."; \
-	    docker start $(FALKORDB_CONTAINER_NAME) >/dev/null; \
-	  else \
-	    echo "Running new FalkorDB container $(FALKORDB_CONTAINER_NAME)..."; \
-	    docker run -d --name $(FALKORDB_CONTAINER_NAME) -p $(FALKORDB_PORT):6379 $(FALKORDB_IMAGE) >/dev/null; \
-	  fi \
-	else \
-	  echo "FalkorDB container $(FALKORDB_CONTAINER_NAME) already running."; \
-	fi
-
-
-# ---------- Run locally ----------
-
-.PHONY: run
-run: run-falkordb
-	MEMORY_GRAPHITI_URI=falkor://localhost:6379 \
-	MEMORY_GRAPH_NAME=photonic_memory \
-	MEMORY_LLM_PROVIDER=openai \
-	MEMORY_EMBEDDING_PROVIDER=openai \
-	$(PYTHON) -m uvicorn $(APP_MODULE) --host $(HOST) --port $(HOST_PORT) --reload
-
-
-# ---------- Docker image ----------
-
-.PHONY: docker-build
-docker-build:
-	cd $(REPO_ROOT) && \
-	docker build \
-	  --build-arg BASE_IMAGE="$(BASE_IMAGE)" \
-	  -t "$(IMAGE_TAG)" \
-	  -f $(SERVICE_DIR)/Dockerfile .
-
-.PHONY: docker-run
-docker-run:
-	docker run -it --rm \
-	  -p $(HOST_PORT):$(CONTAINER_PORT) \
-	  -e MEMORY_GRAPHITI_URI=falkor://falkordb:6379 \
-	  -e MEMORY_GRAPH_NAME=photonic_memory \
-	  -e MEMORY_LLM_PROVIDER=openai \
-	  -e MEMORY_EMBEDDING_PROVIDER=openai \
-	  "$(IMAGE_TAG)"
-
-
-# ---------- Tests & formatting ----------
+.PHONY: check-venv
+check-venv:
+	@test -x $(PY) || { echo "No virtualenv at $(CURDIR)/$(VENV); run 'make install' first"; exit 1; }
 
 .PHONY: test
-test:
-	$(PYTHON) -m pytest -v tests
+test: check-venv
+	$(PY) -m pytest -q tests
+
+.PHONY: lint
+lint:
+	$(RUFF) check src tests
 
 .PHONY: fmt
 fmt:
-	ruff format .
-	ruff check .
+	$(RUFF) format src tests
+	$(RUFF) check --fix src tests
+
+.PHONY: run
+run: check-venv
+	$(COMPOSE) up -d falkordb embeddings
+	MEMORY_FALKORDB_HOST=localhost \
+	MEMORY_LLM_BASE_URL=$(MEMORY_LLM_BASE_URL) \
+	MEMORY_LLM_MODEL=$(MEMORY_LLM_MODEL) \
+	MEMORY_EMBEDDING_BASE_URL=$(MEMORY_EMBEDDING_BASE_URL) \
+	GRAPHITI_TELEMETRY_ENABLED=false \
+	$(PY) -m uvicorn memory_service.app:create_app --factory --host 0.0.0.0 --port $(HOST_PORT) --reload
+
+.PHONY: build
+build:
+	$(COMPOSE) build
+
+.PHONY: up
+up:
+	$(COMPOSE) up -d
+
+.PHONY: down
+down:
+	$(COMPOSE) down
+
+.PHONY: logs
+logs:
+	$(COMPOSE) logs -f
+
+.PHONY: ps
+ps:
+	$(COMPOSE) ps
+
+.PHONY: health
+health:
+	@curl -sf http://localhost:$(HOST_PORT)/health && echo || { echo "memory not reachable on :$(HOST_PORT)"; exit 1; }

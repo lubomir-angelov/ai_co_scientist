@@ -1,13 +1,15 @@
 """
 Document Parser Tool:
- - Usees DeepSeek OCR Server Client to parse documents (PDF/images).
+ - Uses the DeepSeekOCR server to parse documents (PDF/images).
 
 Calls a local/remote FastAPI OCR server:
   POST {base_url}/ocr/extract
 with payload:
   {"doc_id": "...", "content_b64": "..."}
 
-Returns a structured dict and (optionally) writes artifacts to output_dir.
+Returns a structured dict and (optionally) writes artifacts to output_dir. ``base_url``,
+``timeout_s`` and ``auth_header`` default to ``RuntimeConfig.from_env()`` when not given
+explicitly, so an agent call and the paper-ingestion batch share one configuration source.
 """
 
 from __future__ import annotations
@@ -18,12 +20,15 @@ import os
 import re
 import time
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any
 
 import requests
+from pydantic import ValidationError
+from shared_library.data_contracts import OCRResponse
 
+from runtime_config import RuntimeConfig
+from service_errors import OCRServiceError
 from tools.base import BaseTool
-
 
 _URL_RE = re.compile(r"^(http|https|ftp)://", re.IGNORECASE)
 
@@ -31,9 +36,9 @@ _URL_RE = re.compile(r"^(http|https|ftp)://", re.IGNORECASE)
 @dataclass(frozen=True)
 class _ToolConfig:
     base_url: str
-    timeout_s: int
+    timeout_s: float
     verify_tls: bool
-    auth_header: Optional[str]
+    auth_header: str | None
 
 
 class Document_Parser_OCR_Tool(BaseTool):
@@ -55,11 +60,11 @@ class Document_Parser_OCR_Tool(BaseTool):
             input_types={
                 "input_path_or_url": "str - Local file path or URL to a PDF/image.",
                 "doc_id": "str - Optional document id; defaults to filename-derived id.",
-                "base_url": "str - OCR server base URL (default: env OCR_BASE_URL or http://localhost:8002).",
-                "timeout_s": "int - Request timeout in seconds (default: 120).",
+                "base_url": "str - OCR server base URL; default OCR_BASE_URL.",
+                "timeout_s": "float - request timeout; default OCR_REQUEST_TIMEOUT_SECONDS (3600).",
                 "save_artifacts": "bool - Save markdown/json outputs to output_dir (default: True).",
                 "verify_tls": "bool - Verify TLS certificates for HTTPS URLs (default: True).",
-                "auth_header": "str - Optional Authorization header value, e.g. 'Bearer ...'.",
+                "auth_header": "str - Optional Authorization header value; default OCR_AUTH_HEADER.",
             },
             output_type=(
                 "dict - {doc_id, markdown, sections, tables, metadata, "
@@ -91,22 +96,23 @@ class Document_Parser_OCR_Tool(BaseTool):
     def execute(
         self,
         input_path_or_url: str,
-        doc_id: Optional[str] = None,
-        base_url: Optional[str] = None,
-        timeout_s: int = 120,
+        doc_id: str | None = None,
+        base_url: str | None = None,
+        timeout_s: float | None = None,
         save_artifacts: bool = True,
         verify_tls: bool = True,
-        auth_header: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        auth_header: str | None = None,
+    ) -> dict[str, Any]:
+        env = RuntimeConfig.from_env()
         cfg = _ToolConfig(
-            base_url=(base_url or os.environ.get("OCR_BASE_URL", "http://localhost:8002")).rstrip("/"),
-            timeout_s=int(timeout_s),
+            base_url=(base_url if base_url is not None else env.ocr_base_url).rstrip("/"),
+            timeout_s=float(timeout_s if timeout_s is not None else env.ocr_request_timeout_seconds),
             verify_tls=bool(verify_tls),
-            auth_header=auth_header or os.environ.get("OCR_AUTH_HEADER"),
+            auth_header=auth_header if auth_header is not None else env.ocr_auth_header,
         )
 
         started = time.time()
-        doc_id_final = doc_id or self._infer_doc_id(input_path_or_url)
+        doc_id_final = doc_id if doc_id is not None else self._infer_doc_id(input_path_or_url)
 
         content_bytes, source_kind = self._load_bytes(input_path_or_url, cfg)
         content_b64 = base64.b64encode(content_bytes).decode("utf-8")
@@ -114,27 +120,23 @@ class Document_Parser_OCR_Tool(BaseTool):
         payload = {"doc_id": doc_id_final, "content_b64": content_b64}
 
         t0 = time.time()
-        response_json = self._post_ocr(cfg, payload)
+        response = self._post_ocr(cfg, payload)
         t1 = time.time()
 
-        sections = response_json.get("sections", []) or []
-        tables = response_json.get("tables", []) or []
-        metadata = response_json.get("metadata", {}) or {}
+        markdown = self._combine_sections_to_markdown(response.sections)
 
-        markdown = self._combine_sections_to_markdown(sections)
-
-        artifacts: Dict[str, Optional[str]] = {"markdown_path": None, "json_path": None}
+        artifacts: dict[str, str | None] = {"markdown_path": None, "json_path": None}
         if save_artifacts:
-            artifacts = self._write_artifacts(doc_id_final, markdown, response_json)
+            artifacts = self._write_artifacts(response.doc_id, markdown, response)
 
         finished = time.time()
         return {
-            "doc_id": response_json.get("doc_id", doc_id_final),
+            "doc_id": response.doc_id,
             "source": {"kind": source_kind, "input": input_path_or_url},
             "markdown": markdown,
-            "sections": sections,
-            "tables": tables,
-            "metadata": metadata,
+            "sections": [s.model_dump(mode="json") for s in response.sections],
+            "tables": [t.model_dump(mode="json") for t in response.tables],
+            "metadata": response.metadata,
             "artifacts": artifacts,
             "timings_ms": {
                 "ocr_request_ms": int((t1 - t0) * 1000),
@@ -144,23 +146,24 @@ class Document_Parser_OCR_Tool(BaseTool):
 
     def _infer_doc_id(self, input_path_or_url: str) -> str:
         if _URL_RE.match(input_path_or_url):
-            # Try to derive from URL path; fallback to "document"
             tail = input_path_or_url.split("?")[0].rstrip("/").split("/")[-1]
-            base = tail or "document"
+            base = tail
         else:
-            base = os.path.basename(input_path_or_url) or "document"
+            base = os.path.basename(input_path_or_url)
 
-        # Strip common extensions for nicer ids
         for ext in (".pdf", ".png", ".jpg", ".jpeg", ".tif", ".tiff", ".webp", ".bmp", ".gif"):
             if base.lower().endswith(ext):
                 base = base[: -len(ext)]
                 break
 
-        # keep it filesystem-friendly
         safe = re.sub(r"[^a-zA-Z0-9._-]+", "_", base).strip("_")
-        return safe or "document"
+        if not safe:
+            raise ValueError(
+                f"Could not derive a non-empty doc_id from {input_path_or_url!r}; pass doc_id explicitly."
+            )
+        return safe
 
-    def _load_bytes(self, input_path_or_url: str, cfg: _ToolConfig) -> Tuple[bytes, str]:
+    def _load_bytes(self, input_path_or_url: str, cfg: _ToolConfig) -> tuple[bytes, str]:
         if _URL_RE.match(input_path_or_url):
             resp = requests.get(input_path_or_url, timeout=cfg.timeout_s, verify=cfg.verify_tls)
             resp.raise_for_status()
@@ -172,46 +175,67 @@ class Document_Parser_OCR_Tool(BaseTool):
         with open(input_path_or_url, "rb") as f:
             return f.read(), "file"
 
-    def _post_ocr(self, cfg: _ToolConfig, payload: Dict[str, Any]) -> Dict[str, Any]:
+    def _post_ocr(self, cfg: _ToolConfig, payload: dict[str, Any]) -> OCRResponse:
         url = f"{cfg.base_url}/ocr/extract"
         headers = {"Content-Type": "application/json"}
         if cfg.auth_header:
             headers["Authorization"] = cfg.auth_header
 
-        resp = requests.post(url, json=payload, headers=headers, timeout=cfg.timeout_s, verify=cfg.verify_tls)
+        try:
+            resp = requests.post(
+                url, json=payload, headers=headers, timeout=cfg.timeout_s, verify=cfg.verify_tls
+            )
+        except requests.RequestException as exc:
+            raise OCRServiceError(
+                f"OCR service unreachable at {url} (timeout={cfg.timeout_s}s): {exc}",
+                status_code=None,
+            ) from exc
+
         if resp.status_code >= 400:
-            # Try to surface FastAPI detail payloads cleanly
             try:
-                err = resp.json()
-            except Exception:
-                err = {"detail": resp.text}
-            raise RuntimeError(f"OCR server error {resp.status_code}: {err}")
+                detail = resp.json()
+            except ValueError:
+                detail = resp.text
+            raise OCRServiceError(
+                f"OCR server error {resp.status_code} on POST {url}: {detail}",
+                status_code=resp.status_code,
+            )
 
-        return resp.json()
+        try:
+            return OCRResponse.model_validate(resp.json())
+        except ValidationError as exc:
+            raise OCRServiceError(
+                f"OCR response violates OCRResponse contract: {exc}",
+                status_code=resp.status_code,
+            ) from exc
 
-    def _combine_sections_to_markdown(self, sections: List[Dict[str, Any]]) -> str:
-        parts: List[str] = []
+    def _combine_sections_to_markdown(self, sections: list[Any]) -> str:
+        parts: list[str] = []
         for sec in sections:
-            name = (sec.get("name") or "").strip()
-            text = (sec.get("text") or "").rstrip()
+            name = sec.name.strip()
+            text = sec.text.rstrip()
             if name:
                 parts.append(f"## {name}\n\n{text}\n")
             else:
                 parts.append(f"{text}\n")
         return "\n".join(parts).strip() + "\n" if parts else ""
 
-    def _write_artifacts(self, doc_id: str, markdown: str, response_json: Dict[str, Any]) -> Dict[str, Optional[str]]:
+    def _write_artifacts(
+        self, doc_id: str, markdown: str, response: OCRResponse
+    ) -> dict[str, str | None]:
         out_dir = self.output_dir or os.path.join(os.getcwd(), "ocr_outputs")
         os.makedirs(out_dir, exist_ok=True)
 
         md_path = os.path.join(out_dir, f"{doc_id}.md")
         json_path = os.path.join(out_dir, f"{doc_id}.json")
+        json_tmp_path = f"{json_path}.tmp"
 
         with open(md_path, "w", encoding="utf-8") as f:
             f.write(markdown)
 
-        with open(json_path, "w", encoding="utf-8") as f:
-            json.dump(response_json, f, ensure_ascii=False, indent=2)
+        with open(json_tmp_path, "w", encoding="utf-8") as f:
+            json.dump(response.model_dump(mode="json"), f, ensure_ascii=False, indent=2)
+        os.replace(json_tmp_path, json_path)
 
         return {"markdown_path": md_path, "json_path": json_path}
 
@@ -219,25 +243,22 @@ class Document_Parser_OCR_Tool(BaseTool):
 if __name__ == "__main__":
     # Minimal manual test:
     #   python tool.py
-    #   (expects OCR server at http://localhost:8002)
+    #   (expects OCR server at OCR_BASE_URL, default http://localhost:8002)
     tool = Document_Parser_OCR_Tool()
     tool.set_custom_output_dir("detected_ocr")
 
-    # Change this to a real file in your environment.
     sample = os.environ.get("OCR_SAMPLE_INPUT", "examples/quantum_photonics_qems_mems.pdf")
 
-    try:
-        result = tool.execute(input_path_or_url=sample, save_artifacts=True)
-        print(json.dumps(
+    result = tool.execute(input_path_or_url=sample, save_artifacts=True)
+    print(
+        json.dumps(
             {
                 "doc_id": result["doc_id"],
                 "artifacts": result["artifacts"],
                 "timings_ms": result["timings_ms"],
                 "metadata": result["metadata"],
-                "markdown_preview": result["markdown"][:400],
             },
             indent=2,
             ensure_ascii=False,
-        ))
-    except Exception as e:
-        print(f"Execution failed: {e}")
+        )
+    )

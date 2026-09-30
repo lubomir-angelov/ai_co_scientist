@@ -26,10 +26,11 @@ from PIL import Image
 # run with make run to add the shared_library to PYTHONPATH
 # or export it manually before running uvicorn
 from shared_library.data_contracts import (
+    OCR_FULLTEXT_SECTION,
     OCRRequest,
     OCRResponse,
     OCRSection,
-    OCRTable,
+    ocr_page_section_name,
 )
 
 from utils import parse_deepseek_grounded_output, blocks_to_markdown
@@ -278,12 +279,12 @@ async def extract(req: OCRRequest):
 
         sections: list[OCRSection] = []
         for i, text in enumerate(texts):
-            sections.append(OCRSection(name=f"Page {i+1}", text=text))
+            sections.append(OCRSection(name=ocr_page_section_name(i + 1), text=text))
 
         # Optional: also provide a combined section
         combined = "\n\n".join([t.strip() for t in texts if (t or "").strip()]).strip()
         if combined:
-            sections.insert(0, OCRSection(name="FullText", text=combined))
+            sections.insert(0, OCRSection(name=OCR_FULLTEXT_SECTION, text=combined))
 
         return OCRResponse(
             doc_id=req.doc_id,

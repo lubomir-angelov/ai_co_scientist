@@ -1,11 +1,15 @@
+import pytest
+
 from datetime import datetime
 from shared_library.data_contracts import (
+    OCR_FULLTEXT_SECTION,
     OCRRequest,
     OCRResponse,
     OCRSection,
     OCRTable,
     FactTriple,
     UpsertFactsRequest,
+    ocr_page_section_name,
 )
 
 def test_ocr_models_roundtrip():
@@ -32,3 +36,11 @@ def test_fact_models():
     )
     upsert = UpsertFactsRequest(facts=[fact])
     assert upsert.facts[0].subject == "Alloy_X"
+
+
+def test_ocr_page_section_name_is_the_one_shared_definition():
+    assert OCR_FULLTEXT_SECTION == "FullText"
+    assert ocr_page_section_name(1) == "Page 1"
+    assert ocr_page_section_name(12) == "Page 12"
+    with pytest.raises(ValueError):
+        ocr_page_section_name(0)

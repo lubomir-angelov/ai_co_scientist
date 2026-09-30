@@ -1,55 +1,74 @@
-# services/ocr_mcp/Makefile
+# services/ocr_mcp/Makefile - MCP server exposing the OCR service as tools
 
-BASE_IMAGE    ?= python:3.12-slim
-IMAGE_TAG     ?= ocr-mcp-service
+PYTHON  ?= python3
+VENV    ?= .venv
+PY      := $(VENV)/bin/python
+RUFF    := $(if $(wildcard $(VENV)/bin/ruff),$(VENV)/bin/ruff,ruff)
+COMPOSE := docker compose -f compose.yaml
 
-CONTAINER_PORT ?= 8003
-HOST_PORT      ?= 8003
-
-PYTHON ?= python3
-APP_MODULE := src.server
-
-# repo root (two levels up from services/ocr_mcp)
-REPO_ROOT := $(abspath $(PWD)/../..)
-SERVICE_DIR := services/ocr_mcp
+HOST_PORT    ?= 8003
+OCR_BASE_URL ?= http://localhost:8002
 
 .PHONY: help
 help:
-	@echo "make install        - install deps for local development"
-	@echo "make run            - run MCP server locally (stdio transport)"
-	@echo "make run-http       - run MCP server with streamable-http locally"
-	@echo "make docker-build   - build docker image"
-	@echo "make docker-run     - run docker container"
-	@echo "make test           - run tests"
+	@echo "make install   - create $(VENV) with service + test deps"
+	@echo "make test      - unit tests (OCR service mocked)"
+	@echo "make lint      - ruff check"
+	@echo "make fmt       - ruff format + ruff check --fix"
+	@echo "make run       - run the MCP server locally over stdio"
+	@echo "make run-http  - run the MCP server locally over streamable HTTP on :$(HOST_PORT)"
+	@echo "make build     - build the image (compose.yaml)"
+	@echo "make up / down - start / stop the container (expects ocr on the shared network)"
+	@echo "make logs / ps - compose logs / status"
 
 .PHONY: install
 install:
-	$(PYTHON) -m pip install -r requirements.txt
+	$(PYTHON) -m venv $(VENV)
+	$(PY) -m pip install -q --upgrade pip
+	$(PY) -m pip install -q -r requirements.txt -r requirements_test.txt ruff==0.15.12
 
-.PHONY: run
-run:
-	MCP_TRANSPORT=stdio $(PYTHON) -m $(APP_MODULE)
-
-.PHONY: run-http
-run-http:
-	MCP_TRANSPORT=streamable-http MCP_HOST=0.0.0.0 MCP_PORT=8003 $(PYTHON) -m $(APP_MODULE)
-
-.PHONY: docker-build
-docker-build:
-	docker build \
-	  -t "$(IMAGE_TAG)" \
-	  -f $(SERVICE_DIR)/Dockerfile .
-
-.PHONY: docker-run
-docker-run:
-	docker run -it --rm \
-	  -p $(HOST_PORT):$(CONTAINER_PORT) \
-	  -e OCR_BASE_URL=$(OCR_BASE_URL) \
-	  -e MCP_TRANSPORT=streamable-http \
-	  -e MCP_HOST=0.0.0.0 \
-	  -e MCP_PORT=$(CONTAINER_PORT) \
-	  "$(IMAGE_TAG)"
+.PHONY: check-venv
+check-venv:
+	@test -x $(PY) || { echo "No virtualenv at $(CURDIR)/$(VENV); run 'make install' first"; exit 1; }
 
 .PHONY: test
-test:
-	$(PYTHON) -m pytest -v tests 2>/dev/null || echo "No tests directory yet"
+test: check-venv
+	$(PY) -m pytest -q tests
+
+.PHONY: lint
+lint:
+	$(RUFF) check src tests
+
+.PHONY: fmt
+fmt:
+	$(RUFF) format src tests
+	$(RUFF) check --fix src tests
+
+.PHONY: run
+run: check-venv
+	OCR_BASE_URL=$(OCR_BASE_URL) MCP_TRANSPORT=stdio $(PY) -m src.server
+
+.PHONY: run-http
+run-http: check-venv
+	OCR_BASE_URL=$(OCR_BASE_URL) MCP_TRANSPORT=streamable-http MCP_HOST=0.0.0.0 MCP_PORT=$(HOST_PORT) \
+	$(PY) -m src.server
+
+.PHONY: build
+build:
+	$(COMPOSE) build
+
+.PHONY: up
+up:
+	$(COMPOSE) up -d
+
+.PHONY: down
+down:
+	$(COMPOSE) down
+
+.PHONY: logs
+logs:
+	$(COMPOSE) logs -f
+
+.PHONY: ps
+ps:
+	$(COMPOSE) ps

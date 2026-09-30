@@ -141,7 +141,7 @@ ConceptQuery, MemoryFact
 PaperMemoryBackend (add_paper_section, add_paper_note, search_concepts)
 ```
 
-### The MemoryTool card definition (the function schema the LLM sees) that wraps PaperMemoryBackend.
+### (The MemoryTool card the LLM sees lives in octo_agent: `src/tools/memory_graph/tool.py`, an HTTP client for this service.)
 
 So all other services (reader, planner, explainer) just see:
 ```

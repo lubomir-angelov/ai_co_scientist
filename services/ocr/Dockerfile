@@ -38,8 +38,10 @@ WORKDIR /tmp
 COPY ${SERVICE_PATH}/requirements.txt /tmp/requirements_server.txt
 
 # 4) install torch + service deps (slow, but cachable) --------------
-RUN ${VENV_PATH}/bin/python -m pip install --pre torch torchvision torchaudio \
-      --index-url https://download.pytorch.org/whl/nightly/cu128 && \
+#    Pinned stable cu128 builds (RTX 50xx needs CUDA 12.8); unpinned nightlies stop
+#    resolving once the nightly index moves on.
+RUN ${VENV_PATH}/bin/python -m pip install torch==2.10.0 torchvision==0.25.0 torchaudio==2.10.0 \
+      --index-url https://download.pytorch.org/whl/cu128 && \
     ${VENV_PATH}/bin/python -m pip install -r /tmp/requirements_server.txt && \
     rm -rf /root/.cache/pip
 

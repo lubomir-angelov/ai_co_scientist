@@ -1,13 +1,13 @@
 import argparse
-import time
 import json
-from typing import Optional
+import time
 
-from models.initializer import Initializer
-from models.planner import Planner
-from models.memory import Memory
 from models.executor import Executor
+from models.initializer import Initializer
+from models.memory import Memory
+from models.planner import Planner
 from models.utils import make_json_serializable_truncated
+
 
 class Solver:
     def __init__(
@@ -32,7 +32,7 @@ class Solver:
         self.output_types = output_types.lower().split(',')
         assert all(output_type in ["base", "final", "direct"] for output_type in self.output_types), "Invalid output type. Supported types are 'base', 'final', 'direct'."
         self.verbose = verbose
-    def solve(self, question: str, image_path: Optional[str] = None):
+    def solve(self, question: str, image_path: str | None = None):
         """
         Solve a single problem from the benchmark dataset.
         
@@ -66,14 +66,14 @@ class Solver:
         # Continue with query analysis and tool execution if final or direct responses are needed
         if {'final', 'direct'} & set(self.output_types):
             if self.verbose:
-                print(f"\n==> 🐙 Reasoning Steps from OctoTools (Deep Thinking...)")
+                print("\n==> 🐙 Reasoning Steps from OctoTools (Deep Thinking...)")
 
             # [1] Analyze query
             query_start_time = time.time()
             query_analysis = self.planner.analyze_query(question, image_path)
             json_data["query_analysis"] = query_analysis
             if self.verbose:
-                print(f"\n==> 🔍 Step 0: Query Analysis\n")
+                print("\n==> 🔍 Step 0: Query Analysis\n")
                 print(f"{query_analysis}")
                 print(f"[Time]: {round(time.time() - query_start_time, 2)}s")
 
@@ -178,12 +178,12 @@ class Solver:
                 print(f"\n==> 🐙 Final Answer:\n\n{direct_output}")
 
             print(f"\n[Total Time]: {round(time.time() - query_start_time, 2)}s")
-            print(f"\n==> ✅ Query Solved!")
+            print("\n==> ✅ Query Solved!")
 
         return json_data
 
 def construct_solver(llm_engine_name : str = "Corianas/DeepSeek-R1-Distill-Qwen-14B-AWQ",
-                     enabled_tools : list[str] = ["all"],
+                     enabled_tools : list[str] | None = None,
                      output_types : str = "final,direct",
                      max_steps : int = 10,
                      max_time : int = 300,
@@ -192,6 +192,9 @@ def construct_solver(llm_engine_name : str = "Corianas/DeepSeek-R1-Distill-Qwen-
                      verbose : bool = True,
                      vllm_config_path : str = None):
     
+    if enabled_tools is None:
+        enabled_tools = ["all"]
+
     # Instantiate Initializer
     initializer = Initializer(
         enabled_tools=enabled_tools,
@@ -202,7 +205,6 @@ def construct_solver(llm_engine_name : str = "Corianas/DeepSeek-R1-Distill-Qwen-
 
     # Instantiate Planner
     planner = Planner(
-        llm_engine_name=llm_engine_name,
         toolbox_metadata=initializer.toolbox_metadata,
         available_tools=initializer.available_tools,
         verbose=verbose,

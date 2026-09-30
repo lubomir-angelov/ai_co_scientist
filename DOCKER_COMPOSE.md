@@ -1,190 +1,115 @@
-# Docker Compose Setup
+# Docker Compose
 
-This docker-compose configuration orchestrates all microservices for the AI Co-Scientist platform.
+Docker Compose orchestrates every service, and each service owns its own compose file. The
+root `docker-compose.yml` only `include:`s them, so a service can run on its own or as part
+of the full stack.
 
-## Services
+## Layout
 
-### 1. **LLM Service** (Port 8000)
-- **Image**: `vllm/vllm-openai:latest`
-- **Purpose**: Provides OpenAI-compatible LLM inference
-- **Environment**: GPU-accelerated (all GPUs)
-- **Features**:
-  - DeepSeek-R1 or custom model support
-  - 32K token context window
-  - 90% GPU memory utilization
+| File | Services | Host ports |
+|---|---|---|
+| `services/llm/compose.yaml` (+ `compose.stack.yaml` in the stack) | `llm` (llama.cpp, CUDA), `llm-gateway` (API-key proxy) | 8000, 9000 |
+| `services/ocr/compose.yaml` | `ocr` (DeepSeek-OCR, CUDA) | 8002 |
+| `services/ocr_mcp/compose.yaml` | `ocr-mcp` (MCP over streamable HTTP) | 8003 |
+| `services/memory/compose.yaml` | `falkordb`, `embeddings` (llama.cpp, CPU), `memory` | 6379, 8006, 8005 |
+| `services/octo_agent/compose.yaml` | `orchestrator` (opt-in profile `agent`) | 8001 |
 
-### 2. **LLM Gateway** (Port 9000)
-- **Image**: Built from `services/llm/src/gateway`
-- **Purpose**: Authentication proxy for LLM service
-- **API Key**: Configured via `LLM_API_KEY` env var (default: `local-llm`)
-- **Depends on**: LLM service (healthcheck)
-
-### 3. **OCR Service** (Port 8002)
-- **Image**: Built from `services/ocr/Dockerfile`
-- **Purpose**: DeepSeek OCR for document/image text extraction
-- **GPU**: Uses GPU device 1 (separate from LLM)
-- **Features**:
-  - PDF and image processing
-  - Bfloat16 precision
-  - Eager attention (no flash attention)
-  - Model cached at `/opt/models/deepseek-ocr`
-- **Dependencies**: LLM Gateway (for coordination)
-
-### 4. **Orchestrator** (Port 8001)
-- **Image**: Built from `services/orchestrator/Dockerfile`
-- **Purpose**: Agent loop coordinating between services
-- **Endpoints**:
-  - `GET /health` - Health check
-  - `GET /tools` - List available tools
-  - `POST /run` - Execute agent task
-- **Dependencies**: LLM Gateway and OCR service
+- **Shared network.** Every file uses the network `ai-co-scientist-network`, so services
+  started separately still reach each other by service name (e.g. `http://llm-gateway:8000/v1`).
+- **Persistent graph.** The FalkorDB volume is always `ai-co-scientist-falkordb-data`,
+  whichever way the service is started.
+- **No cross-file `depends_on`.** Compose rejects references to services in other files.
+  Services tolerate dependencies that start later: memory reports `ready: false` or returns
+  `502 model_unavailable` until they are up.
+- **Orchestrator is opt-in.** Its HTTP entrypoint (`src/agent_loop.py`) doesn't exist yet,
+  so it only starts with `make agent-up`.
 
 ## Prerequisites
 
-- Docker Engine 20.10+
-- Docker Compose 2.0+
-- NVIDIA Docker Runtime
-- 2x GPU (or adjust `CUDA_VISIBLE_DEVICES`)
-- ~60GB free disk space (for model downloads)
+- Docker with Compose ≥ 2.20 (for `include`) and the NVIDIA container toolkit (see
+  `services/README.md`).
+- Models on disk (git-ignored):
+  - `models/hotswap/Qwen3.8-27B-UD-Q4_K_XL/Qwen3.8-27B-UD-Q4_K_XL.gguf`: main LLM
+  - `models/embeddings/Qwen3-Embedding-0.6B-Q8_0.gguf`: embeddings for memory
+
+  ```bash
+  mkdir -p models/embeddings
+  curl -L -o models/embeddings/Qwen3-Embedding-0.6B-Q8_0.gguf \
+    https://huggingface.co/Qwen/Qwen3-Embedding-0.6B-GGUF/resolve/main/Qwen3-Embedding-0.6B-Q8_0.gguf
+  ```
+- The OCR image downloads DeepSeek-OCR at build time, and the image is about 70 GB.
 
 ## Configuration
 
-1. **Copy environment template**:
-   ```bash
-   cp .env.example .env
-   ```
+Copy `.env.example` to `.env` in the repo root (Compose reads it automatically). Key variables:
 
-2. **Edit `.env` if needed**:
-   - `LLM_MODEL`: Change LLM model (default: DeepSeek-R1-Distill-Qwen-14B)
-   - `LLM_API_KEY`: Set authentication key
-   - `CUDA_VISIBLE_DEVICES`: Assign GPUs
+| Variable | Default | Effect |
+|---|---|---|
+| `LLM_API_KEY` | `local-llm` | Gateway key, also used by memory |
+| `LLM_REASONING` | `off` in the stack, `on` standalone | Qwen thinking: `on` / `off` / `auto` (`auto` means on for Qwen) |
+| `MEMORY_LLM_MODEL` | `Qwen3.8-27B-UD-Q4_K_XL` | Must match the llm service's `--alias` |
+| `MEMORY_LLM_STRUCTURED_OUTPUT` | `json_schema` | Use `json_object` if structured output fails |
+| `MEMORY_GRAPH_NAME` | `photonic_memory` | FalkorDB graph |
+| `EMBEDDING_MODEL_FILE` / `EMBEDDING_MODEL` / `EMBEDDING_DIM` | Qwen3-Embedding-0.6B / 1024 | Embeddings |
 
-## Quick Start
+## Commands
 
-### Build Services
+From the repo root:
+
 ```bash
-docker-compose build
+make build            # build all images (the OCR image is large)
+make up               # llm, llm-gateway, ocr, ocr-mcp, falkordb, embeddings, memory
+make health           # check every endpoint
+make ps / make logs
+make down
+
+LLM_REASONING=on make up          # full stack with Qwen thinking on
+make llm-up | memory-up | ocr-up | ocr-mcp-up   # parts of the stack (and matching -down)
+make agent-up                     # orchestrator (opt-in)
 ```
 
-### Start All Services
+Run a single service standalone (it uses its own compose project, on the same shared network):
+
 ```bash
-docker-compose up -d
+make -C services/llm up        # thinking on by default; LLM_REASONING=off make -C services/llm up
+make -C services/memory up
+make -C services/ocr up
+make -C services/ocr_mcp up
 ```
 
-### View Logs
+## GPU budget (single RTX 5090, 32 GB)
+
+The 27B Q4 model with a 256k context uses most of the card on its own. The OCR model also
+runs on GPU 0, so running both at once may not fit. Embeddings run on CPU to leave VRAM for
+the LLM. In the live check, the LLM at 32k context used about 18 GB on top of 5.7 GB already
+used by other containers.
+
+## Endpoints
+
 ```bash
-docker-compose logs -f
-```
+# LLM via the gateway (requires the API key)
+curl -s -H "Authorization: Bearer local-llm" http://localhost:9000/v1/models
+curl -s http://localhost:9000/v1/chat/completions \
+  -H "Authorization: Bearer local-llm" -H "Content-Type: application/json" \
+  -d '{"model":"Qwen3.8-27B-UD-Q4_K_XL","messages":[{"role":"user","content":"Hello"}]}'
 
-### Check Service Health
-```bash
-# LLM Gateway
-curl -H "x-api-key: local-llm" http://localhost:9000/v1/models
+# OCR: body is {"doc_id", "content_b64"} with base64 PDF or image bytes
+curl -s http://localhost:8002/healthz
+printf '{"doc_id":"paper-1","content_b64":"%s"}' "$(base64 -w0 paper.pdf)" \
+  | curl -s http://localhost:8002/ocr/extract -H "Content-Type: application/json" -d @-
 
-# OCR Service
-curl http://localhost:8002/healthz
-
-# Orchestrator
-curl http://localhost:8001/health
-```
-
-### Stop Services
-```bash
-docker-compose down
-```
-
-## Service Communication
-
-Internal network: `ai-co-scientist-network`
-
-Service URLs (from within Docker):
-- LLM: `http://llm:8000/v1`
-- LLM Gateway: `http://llm-gateway:9000/v1` (requires API key)
-- OCR: `http://ocr:8002`
-- Orchestrator: `http://orchestrator:8001`
-
-## GPU Assignment
-
-- **LLM Service**: All GPUs (via `gpus: all`)
-- **OCR Service**: GPU device 1 (via `gpus: [1]`)
-
-To use different GPUs, modify `CUDA_VISIBLE_DEVICES` env var or adjust service GPU assignments.
-
-## Volume & Caching
-
-- **HuggingFace Cache**: `/workspace/hf-cache` (OCR service)
-- **Model Cache**: `/opt/models/deepseek-ocr` (OCR service)
-
-These are persistent across restarts but stored in container layers. To clean:
-```bash
-docker-compose down -v  # Remove volumes
-docker system prune -a   # Remove unused images
+# Memory (see services/memory/README.md for the full API)
+curl -s http://localhost:8005/health
 ```
 
 ## Troubleshooting
 
-### LLM Service Won't Start
-- Check available GPU memory: `nvidia-smi`
-- Reduce batch size or increase `--max-model-len`
-- Verify NVIDIA runtime: `docker run --rm --gpus all nvidia/cuda:12.8.1-base nvidia-smi`
-
-### OCR Service Timeout
-- First model download takes ~30 mins
-- Check logs: `docker-compose logs ocr`
-- Verify model file: `/opt/models/deepseek-ocr/`
-
-### Memory Service Not Ready
-- Implementation in progress
-- Placeholder only; will be added when graph_store.py implementation is complete
-
-## Development
-
-### Local Development (non-Docker)
-
-For OCR service:
-```bash
-cd services/ocr
-make install
-make run  # Runs on localhost:8002
-```
-
-For Orchestrator:
-```bash
-cd services/orchestrator
-pip install -r requirements.txt
-uvicorn src.agent_loop:app --host 0.0.0.0 --port 8001 --reload
-```
-
-### Rebuilding After Code Changes
-```bash
-docker-compose build --no-cache
-docker-compose up -d
-```
-
-## API Examples
-
-### Call LLM via Gateway
-```bash
-curl -X POST http://localhost:9000/v1/chat/completions \
-  -H "Content-Type: application/json" \
-  -H "x-api-key: local-llm" \
-  -d '{
-    "model": "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B",
-    "messages": [{"role": "user", "content": "Hello!"}]
-  }'
-```
-
-### Extract Text from Image via OCR
-```bash
-curl -X POST http://localhost:8002/ocr/extract \
-  -H "Content-Type: application/json" \
-  -d '{
-    "image_base64": "<base64-encoded-image>",
-    "format": "base64"
-  }'
-```
-
-### List Agent Tools
-```bash
-curl http://localhost:8001/tools
-```
+- **The LLM doesn't fit in VRAM.** Check `nvidia-smi`, then lower `--ctx-size` in
+  `services/llm/compose.yaml`, or stop OCR.
+- **Memory returns `backend_unavailable`.** FalkorDB isn't reachable; check
+  `docker compose logs falkordb`. The service retries on the next request.
+- **Memory returns `model_unavailable`.** The llm-gateway or embeddings service is down, or
+  `MEMORY_LLM_MODEL` doesn't match the served model id (`/v1/models`).
+- **Graphiti extraction fails on malformed JSON.** Set `MEMORY_LLM_STRUCTURED_OUTPUT=json_object`.
+- **The OCR build fails while resolving torch.** The Dockerfile pins stable torch 2.10.0 cu128.
+  Don't switch back to the nightly index.

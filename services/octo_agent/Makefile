@@ -3,12 +3,16 @@
 
 SHELL := /bin/bash
 .SHELLFLAGS := -euo pipefail -c
-VENV := ~/venvs/ai_cosc_orchestrator
+VENV := $(HOME)/venvs/ai_cosc_orchestrator
 PYTHON := $(VENV)/bin/python
 PIP := $(VENV)/bin/pip
 PYTEST := $(VENV)/bin/pytest
-SRC_DIR := $(PWD)/src
-PYTHONPATH := $(SRC_DIR):$(PYTHONPATH)
+SRC_DIR := $(CURDIR)/src
+# src/ is the import root; ../common/src provides shared_library
+export PYTHONPATH := $(SRC_DIR):$(CURDIR)/../common/src:$(PYTHONPATH)
+RUFF := $(if $(wildcard $(VENV)/bin/ruff),$(VENV)/bin/ruff,ruff)
+COMPOSE := docker compose -f compose.yaml --profile agent
+LLM_MODEL ?= Qwen3.8-27B-UD-Q4_K_XL
 
 # Services
 OCR_URL ?= http://localhost:8002
@@ -55,7 +59,7 @@ install: venv ## Install dependencies
 
 .PHONY: install-test
 install-test: install ## Install test dependencies
-	@$(PIP) install -r requirements_test.txt
+	@$(PIP) install -q -r requirements_test.txt ruff==0.15.12
 	@echo "✓ Test dependencies installed"
 
 .PHONY: activate
@@ -80,34 +84,48 @@ pythonpath: ## Show PYTHONPATH
 
 .PHONY: test
 test: install-test ## Run all tests
-	@PYTHONPATH=$(PYTHONPATH) $(PYTEST) tests/ -v
+	@$(PYTEST) tests/
 
-# ---- Linting & Formatting --------------------------------------------------
+# ---- Linting & Formatting (ruff, per AGENTS.md) ------------------------------
 
 .PHONY: lint
-lint: install ## Run linting (flake8, mypy)
-	@$(PIP) install flake8 mypy
-	@PYTHONPATH=$(PYTHONPATH) flake8 src/ tests/ --max-line-length=100
-	@PYTHONPATH=$(PYTHONPATH) mypy src/ --ignore-missing-imports
+lint: ## Run ruff check
+	@$(RUFF) check src tests
 	@echo "✓ Linting passed"
 
+.PHONY: fmt
+fmt: ## Format with ruff and apply safe fixes
+	@$(RUFF) format src tests
+	@$(RUFF) check --fix src tests
+
 .PHONY: format
-format: install ## Format code with black
-	@$(PIP) install black
-	@PYTHONPATH=$(PYTHONPATH) black src/ tests/ --line-length=100
-	@echo "✓ Code formatted"
+format: fmt ## Alias for fmt
 
 .PHONY: format-check
-format-check: install ## Check code formatting
-	@$(PIP) install black
-	@PYTHONPATH=$(PYTHONPATH) black src/ tests/ --line-length=100 --check
-	@echo "✓ Formatting check passed"
+format-check: ## Check formatting with ruff
+	@$(RUFF) format --check src tests
+
+# ---- Docker -----------------------------------------------------------------
+# The orchestrator HTTP entrypoint (src/agent_loop.py) does not exist yet; the compose
+# service is behind the "agent" profile for that reason.
+
+.PHONY: build
+build: ## Build the orchestrator image
+	$(COMPOSE) build
+
+.PHONY: up
+up: ## Start the orchestrator container
+	$(COMPOSE) up -d
+
+.PHONY: down
+down: ## Stop the orchestrator container
+	$(COMPOSE) down
 
 # ---- Integration -----------------------------------------------------------
 
-.PHONY: run-agent
-run-agent: install ## Run agent loop (set TASK env var)
-	@PYTHONPATH=$(PYTHONPATH) $(PYTHON) -m src.agent_loop --task "$(TASK)"
+.PHONY: run-solver
+run-solver: install ## Run the solver CLI (usage: make run-solver ARGS="--help")
+	@$(PYTHON) src/solver.py $(ARGS)
 
 
 .PHONY: test-ocr
@@ -127,7 +145,7 @@ test-llm: install ## Test LLM service (integration)
 	@echo "$(LLM_URL)/v1/chat/completions"
 	@tmp_body="$$(mktemp)"; tmp_hdr="$$(mktemp)"; \
 	payload="$$(jq -n \
-	  --arg model "Qwen3.6-27B-UD-Q5_K_XL" \
+	  --arg model "$(LLM_MODEL)" \
 	  --arg msg "Reply with exactly one word: pong" \
 	  '{model:$$model,messages:[{role:"user",content:$$msg}],temperature:0,max_tokens:64,stream:false}')" ; \
 	code="$$(curl -sS --connect-timeout 2 --max-time 180 \
@@ -155,6 +173,33 @@ test-tools-integration: install ## Run tools integration tests (LLM + OCR)
 	## Run LLM + OCR integration checks
 	@$(MAKE) test-llm
 	@$(MAKE) test-ocr
+
+
+# ---- Paper ingestion (two phases; the GPU tenant is swapped by the ROOT Makefile) ----
+INGEST_WORK_DIR ?= $(HOME)/ai_cosc_paper_ingest
+# 3 h per PDF: 37 s/page measured -> ~290 pages; largest corpus PDF is 110 pages.
+OCR_TIMEOUT_SECONDS ?= 10800
+# 134 s/page measured x2.5 headroom; ingest timeout = this x page count.
+INGEST_SECONDS_PER_PAGE ?= 300
+# How long to wait for the required GPU tenant / memory to become ready after `up`.
+READY_TIMEOUT_SECONDS ?= 900
+EXCLUDE ?=
+
+.PHONY: papers-ocr
+papers-ocr: install ## Phase 1: OCR every PDF in INPUT_DIR into INGEST_WORK_DIR (LLM must be down)
+	$(if $(INPUT_DIR),,$(error INPUT_DIR is required))
+	@$(PYTHON) -m paper_ingest ocr --input-dir "$(INPUT_DIR)" --work-dir "$(INGEST_WORK_DIR)" \
+	  $(foreach f,$(EXCLUDE),--exclude '$(f)') \
+	  --ocr-timeout-seconds $(OCR_TIMEOUT_SECONDS) --ready-timeout-seconds $(READY_TIMEOUT_SECONDS)
+
+.PHONY: papers-ingest
+papers-ingest: install ## Phase 2: metadata + memory ingest from the OCR cache (OCR must be down)
+	@$(PYTHON) -m paper_ingest ingest --work-dir "$(INGEST_WORK_DIR)" \
+	  --ingest-seconds-per-page $(INGEST_SECONDS_PER_PAGE) --ready-timeout-seconds $(READY_TIMEOUT_SECONDS)
+
+.PHONY: papers-status
+papers-status: ## Show per-paper ingestion state
+	@$(PYTHON) -m paper_ingest status --work-dir "$(INGEST_WORK_DIR)"
 
 
 # ---- Maintenance -----------------------------------------------------------
