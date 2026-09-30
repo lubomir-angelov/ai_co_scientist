@@ -15,7 +15,7 @@ The agent focuses on three main capabilities:
 ai_co_scientist/
 ├── docker-compose.yml   # includes services/*/compose.yaml
 ├── Makefile             # stack + dev targets (make help)
-├── STATUS.md            # current status and next steps
+├── docs/                # STATUS.md: current status and next steps
 ├── DOCKER_COMPOSE.md    # compose layout, configuration, troubleshooting
 ├── models/              # GGUF models (git-ignored): hotswap/ (LLM), embeddings/
 └── services/

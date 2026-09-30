@@ -3,7 +3,7 @@
 The orchestrator (`services/octo_agent`) is the co-scientist's "brain". It plans, calls tools
 and synthesises answers. It never does a tool's job itself: OCR, memory and the LLM are
 separate services behind thin HTTP tool wrappers. This document describes what exists and
-what remains; see `STATUS.md` for the overall project state.
+what remains; see `docs/STATUS.md` for the overall project state.
 
 ## Architecture
 

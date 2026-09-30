@@ -16,7 +16,7 @@ Configuration (the single source is `RuntimeConfig.from_env()` in `src/runtime_c
 `OCR_REQUEST_TIMEOUT_SECONDS`, `MEMORY_BASE_URL`, `MEMORY_REQUEST_TIMEOUT_SECONDS`.
 
 > **Status:** the HTTP entrypoint (`src/agent_loop.py`) the Dockerfile expects doesn't exist
-> yet, so the compose service sits behind the `agent` profile. See `STATUS.md`.
+> yet, so the compose service sits behind the `agent` profile. See `docs/STATUS.md`.
 
 ## Development
 
@@ -64,7 +64,7 @@ and it is resumable — a crash or a `Ctrl-C` loses at most the one paper in fli
 **One-time pre-run step.** Before ingesting a real corpus, wipe any test data already in the
 memory graph so publication dates stay honest (episode identity includes the title and date,
 so re-ingesting under a different date creates a second, differently-dated copy rather than
-replacing the first — see "Known issues" in `STATUS.md`):
+replacing the first — see "Known issues" in `docs/STATUS.md`):
 
 ```bash
 docker compose exec falkordb redis-cli GRAPH.DELETE photonic_memory
