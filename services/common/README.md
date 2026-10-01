@@ -2,8 +2,8 @@
 
 Stable cross-service contracts, imported by every service as `shared_library`.
 
-- `data_contracts.py`: Pydantic request/response models. It covers OCR (`OCRRequest`,
-  `OCRResponse`) and memory (`PaperMeta`, the episode inputs, `ConceptQuery`,
+- `data_contracts.py`: Pydantic request/response models. It covers OCR (`DocId`, `OCRRequest`,
+  `OCRResponse` with typed `pages` of `OCRBlock`s) and memory (`PaperMeta`, the episode inputs, `ConceptQuery`,
   `FactChangesQuery`, `MemoryFact`, `EpisodeAck`, ...).
 - `memory_interface.py`: the `PaperMemoryBackend` abstract interface that the memory
   service implements.

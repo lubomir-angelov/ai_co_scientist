@@ -12,6 +12,13 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
+from pydantic import TypeAdapter, ValidationError
+from shared_library.data_contracts import DocId
+
+# The one definition of a legal document id (shared with OCR and voice): checked at discovery
+# time so an unusable filename fails the whole run up front, not at the first OCR call.
+_DOC_ID = TypeAdapter(DocId)
+
 # arXiv new-scheme filename: YYMM.NNNN[N] with an optional version suffix, stripped before
 # building paper_id. YY < 7 predates the 2007 new numbering scheme, so it is not an arXiv id.
 _ARXIV_STEM_RE = re.compile(r"^(?P<yy>\d{2})(?P<mm>\d{2})\.(?P<seq>\d{4,5})(?:v\d+)?$")
@@ -25,6 +32,14 @@ class PaperIdentity:
     paper_id: str
     source_path: Path
     arxiv_published_at: datetime | None
+
+    def __post_init__(self) -> None:
+        try:
+            _DOC_ID.validate_python(self.paper_id)
+        except ValidationError as exc:
+            raise ValueError(
+                f"{self.source_path.name}: derived paper_id {self.paper_id!r} is not a valid DocId: {exc}"
+            ) from exc
 
 
 def _parse_arxiv_stem(stem: str) -> tuple[str, datetime] | None:

@@ -14,6 +14,10 @@ _VALID_RESPONSE_BODY = {
     "doc_id": "arxiv:2410.12345",
     "sections": [{"name": "Page 1", "text": "hello"}, {"name": "Page 2", "text": "world"}],
     "tables": [],
+    "pages": [
+        {"page_number": 1, "blocks": [{"ref": "text", "bbox": [1, 2, 3, 4], "text": "hello"}]},
+        {"page_number": 2, "blocks": [{"ref": "text", "bbox": None, "text": "world"}]},
+    ],
     "metadata": {"page_count": 2},
 }
 
@@ -47,6 +51,7 @@ def test_execute_returns_validated_response_and_writes_atomic_cache(
 
     assert result["doc_id"] == "arxiv:2410.12345"
     assert result["sections"] == _VALID_RESPONSE_BODY["sections"]
+    assert result["pages"] == _VALID_RESPONSE_BODY["pages"]
     json_path = tmp_path / "arxiv:2410.12345.json"
     assert json_path.is_file()
     assert not (tmp_path / "arxiv:2410.12345.json.tmp").exists()

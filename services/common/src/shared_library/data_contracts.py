@@ -1,12 +1,19 @@
 from __future__ import annotations
 from datetime import datetime, timezone
 from enum import Enum
-from pydantic import BaseModel, Field, model_validator
-from typing import List, Optional
+from pydantic import BaseModel, Field, StringConstraints, model_validator
+from typing import Annotated, List, Optional
 
 # ocr
+
+# One definition of a legal document id: non-empty, no '/', no whitespace. Every path-param
+# use (ocr GET /ocr/documents/{doc_id}, voice routes) and OCRRequest/OCRResponse.doc_id
+# reference this alias (CLAUDE.md §6). A structural pattern on an identifier, not prose.
+DocId = Annotated[str, StringConstraints(min_length=1, pattern=r"^[^/\s]+$")]
+
+
 class OCRRequest(BaseModel):
-    doc_id: str
+    doc_id: DocId
     content_b64: str  # PDF or image bytes, base64
 
 class OCRSection(BaseModel):
@@ -17,11 +24,42 @@ class OCRTable(BaseModel):
     caption: str
     rows: list[dict]
 
+class OCRBlock(BaseModel):
+    """One grounded block as DeepSeek-OCR emitted it, with its FULL text (never capped)."""
+
+    ref: str  # DeepSeek-OCR's own block label, verbatim (e.g. "text", "title", "table")
+    bbox: tuple[int, int, int, int] | None  # None = the model emitted no/invalid det box
+    text: str
+
+
+class OCRPage(BaseModel):
+    page_number: int = Field(ge=1)
+    blocks: list[OCRBlock]
+
+
 class OCRResponse(BaseModel):
-    doc_id: str
+    doc_id: DocId
     sections: list[OCRSection]
     tables: list[OCRTable]
+    pages: list[OCRPage]
     metadata: dict
+
+    @model_validator(mode="after")
+    def _check_pages(self) -> "OCRResponse":
+        for index, page in enumerate(self.pages):
+            if page.page_number != index + 1:
+                raise ValueError(
+                    f"pages must be contiguous from 1 in order; pages[{index}].page_number is "
+                    f"{page.page_number}, expected {index + 1}"
+                )
+        if "page_count" not in self.metadata:
+            raise ValueError("metadata.page_count is required")
+        if self.metadata["page_count"] != len(self.pages):
+            raise ValueError(
+                f"metadata.page_count={self.metadata['page_count']!r} does not match "
+                f"len(pages)={len(self.pages)}"
+            )
+        return self
 
 
 # The one shared definition of OCR page-section names: the OCR server produces them, and

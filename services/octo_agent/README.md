@@ -74,7 +74,9 @@ make memory-down && make memory-up   # restart so Graphiti rebuilds its indices
 **Phase 1 (GPU = OCR).** For every PDF in `INPUT_DIR`, calls `Document_Parser_OCR_Tool`,
 caches the validated `OCRResponse` JSON under `<work-dir>/ocr/<paper_id>.json`, and records
 `ocr.status` in `<work-dir>/state/<paper_id>.json`. Requires the LLM gateway to be down (the
-root target stops it first).
+root target stops it first). `OCRResponse.pages` is required: JSONs cached by an earlier OCR
+service version do not validate and are re-OCR'd on demand (delete the paper's OCR state and
+rerun).
 
 **Phase 2 (GPU = LLM + memory).** For every paper whose OCR is done, resolves the title (and,
 absent a filename-derived date, the publication date) from page 1 via a structured LLM call

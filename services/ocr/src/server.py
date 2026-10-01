@@ -8,8 +8,7 @@ from datetime import datetime, timezone
 from contextlib import asynccontextmanager
 import asyncio
 import shutil
-import glob
-import json
+from pathlib import Path
 
 
 # --- keep your flash-attn disables, do this BEFORE importing transformers ---
@@ -18,6 +17,7 @@ os.environ["TRANSFORMERS_NO_FLASH_ATTENTION"] = "1"
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from transformers import AutoModel, AutoTokenizer
 import torch
 from pdf2image import convert_from_path
@@ -27,17 +27,32 @@ from PIL import Image
 # or export it manually before running uvicorn
 from shared_library.data_contracts import (
     OCR_FULLTEXT_SECTION,
+    DocId,
+    OCRBlock,
+    OCRPage,
     OCRRequest,
     OCRResponse,
     OCRSection,
     ocr_page_section_name,
 )
 
-from utils import parse_deepseek_grounded_output, blocks_to_markdown
+from document_store import DocumentIntegrityError, DocumentNotFoundError, OcrDocumentStore
+from utils import ParsedBlock, parse_deepseek_grounded_output, blocks_to_markdown
 
 MODEL_PATH = "/opt/models/deepseek-ocr"
 
 logger = logging.getLogger("__name__")
+
+
+def _require_documents_dir() -> Path:
+    raw = os.environ.get("OCR_DOCUMENTS_DIR")
+    if not raw:
+        raise RuntimeError("OCR_DOCUMENTS_DIR must be set to the OCR document store directory")
+    return Path(raw)
+
+
+# Read once at import; the store fails the service at startup if the dir is missing/unwritable.
+document_store = OcrDocumentStore(_require_documents_dir())
 
 # Initialize globals so healthz can check them before model loads
 tokenizer = None
@@ -89,44 +104,6 @@ async def healthz():
         "service": "ocr",
         "ready": model is not None and tokenizer is not None,
     }
-
-def _read_saved_text(output_dir: str) -> str:
-    # Prefer markdown
-    md_files = sorted(glob.glob(os.path.join(output_dir, "**", "*.md"), recursive=True))
-    for p in md_files:
-        try:
-            with open(p, "r", encoding="utf-8", errors="ignore") as f:
-                t = f.read().strip()
-            if t:
-                return t
-        except Exception:
-            continue
-
-    # Then JSON
-    json_files = sorted(glob.glob(os.path.join(output_dir, "**", "*.json"), recursive=True))
-    for p in json_files:
-        try:
-            with open(p, "r", encoding="utf-8", errors="ignore") as f:
-                obj = json.load(f)
-            for k in ("text", "markdown", "md", "result", "output"):
-                v = obj.get(k)
-                if isinstance(v, str) and v.strip():
-                    return v.strip()
-        except Exception:
-            continue
-
-    # Then plain text
-    txt_files = sorted(glob.glob(os.path.join(output_dir, "**", "*.txt"), recursive=True))
-    for p in txt_files:
-        try:
-            with open(p, "r", encoding="utf-8", errors="ignore") as f:
-                t = f.read().strip()
-            if t:
-                return t
-        except Exception:
-            continue
-
-    return ""
 
 def is_pdf_bytes(data: bytes) -> bool:
     # PDF files start with: %PDF-
@@ -192,12 +169,7 @@ async def _bytes_to_image_paths_async(data: bytes, filename_hint: str) -> Tuple[
     return [img_path], cleanup_dirs
 
 
-# Optional: cap page concurrency to avoid GPU OOM.
-PAGE_CONCURRENCY = int(os.environ.get("OCR_PAGE_CONCURRENCY", "1"))
-_page_sem = asyncio.Semaphore(PAGE_CONCURRENCY)
-
-
-def _infer_one_page(image_path: str, out_dir: str) -> str:
+def _infer_one_page(image_path: str, out_dir: str) -> Tuple[str, List[ParsedBlock]]:
     os.makedirs(out_dir, exist_ok=True)
 
     prompt = "<image>\n<|grounding|>Convert the document to markdown."
@@ -217,35 +189,27 @@ def _infer_one_page(image_path: str, out_dir: str) -> str:
         eval_mode=True
     )
 
-    #print("infer type:", type(res), flush=True)
-    #print("infer repr:", repr(res)[:500], flush=True)
-
-    text_out = ""
-
-    if isinstance(res, str):
-        blocks = parse_deepseek_grounded_output(res)
-        text_out = blocks_to_markdown(blocks)
-    else:
-        blocks = []
-        # fallback to reading saved files if needed, etc.
-
-    # Optionally: store structured blocks in metadata for debugging
-    metadata_extra = {
-        "block_count": len(blocks),
-        # "blocks": [b.__dict__ for b in blocks],  # careful: can be large
-    }
-
-    metadata_extra["layout_blocks"] = [
-    {"ref": b.ref, "bbox": b.bbox, "text": b.text[:200]}
-        for b in blocks[:200]
-    ]
-
-    return text_out, metadata_extra
+    if not isinstance(res, str):
+        raise RuntimeError(
+            f"model.infer returned {type(res).__name__}, expected str, for {image_path}"
+        )
+    blocks = parse_deepseek_grounded_output(res)
+    return blocks_to_markdown(blocks), blocks
 
 
-async def _infer_one_page_async(image_path: str, out_dir: str) -> str:
-    async with _page_sem:
-        return await asyncio.to_thread(_infer_one_page, image_path, out_dir)
+def _error(status: int, code: str, **extra: str) -> JSONResponse:
+    return JSONResponse(status_code=status, content={"code": code, **extra})
+
+
+@app.get("/ocr/documents/{doc_id}", response_model=OCRResponse)
+async def get_document(doc_id: DocId):
+    try:
+        return document_store.load(doc_id)
+    except DocumentNotFoundError:
+        return _error(404, "document_not_found", doc_id=doc_id)
+    except DocumentIntegrityError:
+        logger.exception("stored OCR document failed integrity check", extra={"doc_id": doc_id})
+        return _error(500, "document_integrity_error", doc_id=doc_id)
 
 
 @app.post("/ocr/extract", response_model=OCRResponse)
@@ -263,19 +227,17 @@ async def extract(req: OCRRequest):
 
         # sequential OCR but non-blocking event loop
         texts = []
-        metadata_pages = []
+        pages: list[OCRPage] = []
         for i, image_path in enumerate(image_paths):
             page_out_dir = os.path.join(out_dir, f"page_{i+1:04d}")
-            page_text, page_metadata = await asyncio.to_thread(_infer_one_page, image_path, page_out_dir)
+            page_text, page_blocks = await asyncio.to_thread(_infer_one_page, image_path, page_out_dir)
             texts.append(page_text)
-            metadata_pages.append(page_metadata)
-
-        # Option B: limited concurrency (still risky on GPU)
-        # texts = await asyncio.gather(*[
-        #     _infer_one_page_async(p, os.path.join(out_dir, f"page_{i+1:04d}"))
-        #     for i, p in enumerate(image_paths)
-        # ])
-
+            pages.append(
+                OCRPage(
+                    page_number=i + 1,
+                    blocks=[OCRBlock(ref=b.ref, bbox=b.bbox, text=b.text) for b in page_blocks],
+                )
+            )
 
         sections: list[OCRSection] = []
         for i, text in enumerate(texts):
@@ -286,18 +248,24 @@ async def extract(req: OCRRequest):
         if combined:
             sections.insert(0, OCRSection(name=OCR_FULLTEXT_SECTION, text=combined))
 
-        return OCRResponse(
+        resp = OCRResponse(
             doc_id=req.doc_id,
             sections=sections,
             tables=[],  # don’t parse tables yet
+            pages=pages,
             metadata={
                 "processed_at": datetime.now(timezone.utc).isoformat(),
                 "engine": "deepseek-ocr",
                 "page_count": len(image_paths),
-                "page_concurrency": PAGE_CONCURRENCY,
-                "pages": metadata_pages,
             },
         )
+        # Persist BEFORE returning: the caller never gets a success whose artifact is not stored.
+        try:
+            await asyncio.to_thread(document_store.save, resp)
+        except OSError:
+            logger.exception("failed to persist OCR document", extra={"doc_id": req.doc_id})
+            return _error(500, "ocr_store_write_failed", doc_id=req.doc_id)
+        return resp
 
     except HTTPException:
         raise

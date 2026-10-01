@@ -1,0 +1,113 @@
+{
+  "doc_id": "paper-1",
+  "sections": [
+    {
+      "name": "FullText",
+      "text": "x"
+    },
+    {
+      "name": "Page 1",
+      "text": "p1"
+    },
+    {
+      "name": "Page 2",
+      "text": "p2"
+    }
+  ],
+  "tables": [],
+  "pages": [
+    {
+      "page_number": 1,
+      "blocks": [
+        {
+          "ref": "text",
+          "bbox": [
+            1,
+            2,
+            3,
+            4
+          ],
+          "text": "Alice Example, Bob Sample"
+        },
+        {
+          "ref": "title",
+          "bbox": [
+            1,
+            2,
+            3,
+            4
+          ],
+          "text": "A Photonic Paper"
+        },
+        {
+          "ref": "text",
+          "bbox": [
+            1,
+            2,
+            3,
+            4
+          ],
+          "text": "Light<sup>25</sup> travels at 10<sup>6</sup> units, see [3\u20135]. The gain is \\(\\Omega_1\\) &amp; more."
+        },
+        {
+          "ref": "image",
+          "bbox": null,
+          "text": ""
+        }
+      ]
+    },
+    {
+      "page_number": 2,
+      "blocks": [
+        {
+          "ref": "sub_title",
+          "bbox": null,
+          "text": "Methods"
+        },
+        {
+          "ref": "table",
+          "bbox": null,
+          "text": "<table><tr><td>1</td></tr></table>"
+        },
+        {
+          "ref": "table_caption",
+          "bbox": null,
+          "text": "Table 1. Data"
+        },
+        {
+          "ref": "text",
+          "bbox": null,
+          "text": "We measure   things\ncarefully."
+        },
+        {
+          "ref": "sub_title",
+          "bbox": null,
+          "text": "Only A Table"
+        },
+        {
+          "ref": "table",
+          "bbox": null,
+          "text": "<table></table>"
+        },
+        {
+          "ref": "sub_title",
+          "bbox": null,
+          "text": "Results"
+        },
+        {
+          "ref": "text",
+          "bbox": null,
+          "text": "It worked."
+        },
+        {
+          "ref": "equation",
+          "bbox": null,
+          "text": "\\[ E = mc^2 \\]"
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "page_count": 2
+  }
+}

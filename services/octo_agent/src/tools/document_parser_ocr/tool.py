@@ -54,7 +54,7 @@ class Document_Parser_OCR_Tool(BaseTool):
             tool_description=(
                 "Client tool for a FastAPI DeepSeek OCR server. "
                 "Accepts a local file path or URL (PDF/image), base64-encodes the bytes, "
-                "calls /ocr/extract, and returns extracted markdown plus sections/tables/metadata."
+                "calls /ocr/extract, and returns extracted markdown plus sections/tables/pages/metadata."
             ),
             tool_version="1.0.0",
             input_types={
@@ -67,7 +67,7 @@ class Document_Parser_OCR_Tool(BaseTool):
                 "auth_header": "str - Optional Authorization header value; default OCR_AUTH_HEADER.",
             },
             output_type=(
-                "dict - {doc_id, markdown, sections, tables, metadata, "
+                "dict - {doc_id, markdown, sections, tables, pages, metadata, "
                 "artifacts:{markdown_path,json_path}, timings_ms:{...}}"
             ),
             demo_commands=[
@@ -136,6 +136,7 @@ class Document_Parser_OCR_Tool(BaseTool):
             "markdown": markdown,
             "sections": [s.model_dump(mode="json") for s in response.sections],
             "tables": [t.model_dump(mode="json") for t in response.tables],
+            "pages": [p.model_dump(mode="json") for p in response.pages],
             "metadata": response.metadata,
             "artifacts": artifacts,
             "timings_ms": {

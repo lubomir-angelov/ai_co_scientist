@@ -193,6 +193,8 @@ examples/notebooks/local_model/*
 **/logs
 **/detected_ocr
 models/
+# voice service host data dir (scripts + rendered MP3s)
+data/voice/
 
 # CCE (code-context-engine)
 # CCE local cache (per-machine, not for version control)

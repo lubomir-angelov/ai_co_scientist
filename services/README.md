@@ -10,6 +10,7 @@ services/
 ├── ocr/          # DeepSeek-OCR FastAPI service (GPU)                          :8002
 ├── ocr_mcp/      # MCP server exposing OCR as tools                            :8003
 ├── memory/       # Graphiti temporal knowledge graph (+ FalkorDB, embeddings) :8005
+├── voice/        # Kokoro-82M TTS (render + stream) and faster-whisper STT (GPU) :8007
 ├── octo_agent/   # OctoTools-style planner/executor/solver + tool wrappers     :8001 (opt-in)
 └── common/       # shared_library: cross-service contracts and interfaces
 ```

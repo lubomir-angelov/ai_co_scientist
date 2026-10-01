@@ -78,19 +78,11 @@ def _must_abort(exc: BaseException) -> bool:
 def page_sections(resp: OCRResponse) -> list[OCRSection]:
     """The paper's page sections in order, with FullText dropped (it duplicates every page).
 
-    Raises OCRContractError when ``metadata.page_count`` is missing/non-int, or when the
-    section names don't match ``ocr_page_section_name(1..page_count)`` exactly.
+    ``OCRResponse`` validates ``metadata.page_count == len(pages)``, so the page count is
+    ``len(resp.pages)``. Raises OCRContractError when the section names don't match
+    ``ocr_page_section_name(1..page_count)`` exactly.
     """
-    try:
-        page_count = resp.metadata["page_count"]
-    except KeyError as exc:
-        raise OCRContractError(
-            f"OCR metadata for doc_id={resp.doc_id!r} is missing page_count"
-        ) from exc
-    if not isinstance(page_count, int):
-        raise OCRContractError(
-            f"OCR metadata.page_count for doc_id={resp.doc_id!r} is not an int: {page_count!r}"
-        )
+    page_count = len(resp.pages)
 
     expected = [ocr_page_section_name(i) for i in range(1, page_count + 1)]
     actual_sections = [s for s in resp.sections if s.name != OCR_FULLTEXT_SECTION]
@@ -255,6 +247,7 @@ def run_ocr_phase(
                     "doc_id": result["doc_id"],
                     "sections": result["sections"],
                     "tables": result["tables"],
+                    "pages": result["pages"],
                     "metadata": result["metadata"],
                 }
             )

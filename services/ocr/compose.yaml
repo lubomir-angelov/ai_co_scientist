@@ -16,7 +16,9 @@ services:
       HF_HOME: /workspace/hf-cache
       TRANSFORMERS_ATTENTION_IMPLEMENTATION: eager
       TRANSFORMERS_NO_FLASH_ATTENTION: "1"
-      OCR_PAGE_CONCURRENCY: ${OCR_PAGE_CONCURRENCY:-1}
+      OCR_DOCUMENTS_DIR: /workspace/documents
+    volumes:
+      - ocr-documents:/workspace/documents
     ports:
       - "8002:8002"
     gpus:
@@ -27,6 +29,10 @@ services:
       timeout: 5s
       retries: 10
       start_period: 120s
+
+volumes:
+  # Every finished OCRResponse, served by GET /ocr/documents/{doc_id}.
+  ocr-documents:
 
 networks:
   default:

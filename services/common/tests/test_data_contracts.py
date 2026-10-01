@@ -1,8 +1,12 @@
 import pytest
 
 from datetime import datetime
+from pydantic import TypeAdapter, ValidationError
 from shared_library.data_contracts import (
     OCR_FULLTEXT_SECTION,
+    DocId,
+    OCRBlock,
+    OCRPage,
     OCRRequest,
     OCRResponse,
     OCRSection,
@@ -20,9 +24,49 @@ def test_ocr_models_roundtrip():
         doc_id="paper-123",
         sections=[OCRSection(name="Abstract", text="We propose...")],
         tables=[OCRTable(caption="Results", rows=[{"temp_C": 450, "yield_MPa": 512}])],
-        metadata={"title": "Cool Photonics Paper"},
+        pages=[OCRPage(page_number=1, blocks=[OCRBlock(ref="text", bbox=(1, 2, 3, 4), text="We propose...")])],
+        metadata={"title": "Cool Photonics Paper", "page_count": 1},
     )
     assert resp.sections[0].name == "Abstract"
+    assert resp.pages[0].blocks[0].text == "We propose..."
+    assert OCRResponse.model_validate_json(resp.model_dump_json()) == resp
+
+
+def _response(pages: list[OCRPage], metadata: dict) -> OCRResponse:
+    return OCRResponse(doc_id="d", sections=[], tables=[], pages=pages, metadata=metadata)
+
+
+def test_ocr_response_requires_contiguous_pages():
+    with pytest.raises(ValidationError, match="contiguous"):
+        _response([OCRPage(page_number=2, blocks=[])], {"page_count": 1})
+
+
+def test_ocr_response_requires_page_count_matching_pages():
+    with pytest.raises(ValidationError, match="does not match"):
+        _response([OCRPage(page_number=1, blocks=[])], {"page_count": 2})
+
+
+def test_ocr_response_requires_page_count_metadata():
+    with pytest.raises(ValidationError, match="page_count is required"):
+        _response([], {})
+
+
+def test_ocr_response_requires_pages_field():
+    with pytest.raises(ValidationError):
+        OCRResponse.model_validate({"doc_id": "d", "sections": [], "tables": [], "metadata": {"page_count": 0}})
+
+
+@pytest.mark.parametrize("bad", ["", "a/b", "has space", "tab\there"])
+def test_doc_id_rejects_illegal_ids(bad):
+    with pytest.raises(ValidationError):
+        TypeAdapter(DocId).validate_python(bad)
+    with pytest.raises(ValidationError):
+        OCRRequest(doc_id=bad, content_b64="x")
+
+
+@pytest.mark.parametrize("good", ["paper-123", "arxiv:2410.12345", "file:my_paper"])
+def test_doc_id_accepts_legal_ids(good):
+    assert TypeAdapter(DocId).validate_python(good) == good
 
 def test_fact_models():
     fact = FactTriple(

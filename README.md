@@ -54,6 +54,7 @@ Prerequisites (GPU setup, model files) are covered in `DOCKER_COMPOSE.md`.
 | `ocr` | 8002 | DeepSeek-OCR document extraction |
 | `ocr-mcp` | 8003 | MCP server exposing OCR tools to agents |
 | `memory` | 8005 | Temporal knowledge-graph memory (Graphiti) |
+| `voice` | 8007 | Kokoro-82M TTS (file render + streaming) and faster-whisper STT (GPU) |
 | `falkordb` | 6379 | Graph database for memory |
 | `embeddings` | 8006 | llama.cpp embeddings (Qwen3-Embedding-0.6B, CPU) |
 | `orchestrator` | 8001 | Agent loop (opt-in: `make agent-up`; entrypoint not implemented yet) |

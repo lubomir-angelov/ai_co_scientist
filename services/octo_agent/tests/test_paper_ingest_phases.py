@@ -7,6 +7,8 @@ from unittest.mock import patch
 import pytest
 from shared_library.data_contracts import (
     OCR_FULLTEXT_SECTION,
+    OCRBlock,
+    OCRPage,
     OCRResponse,
     OCRSection,
     ocr_page_section_name,
@@ -34,7 +36,14 @@ def _ocr_response(doc_id: str, page_texts: list[str]) -> OCRResponse:
     combined = "\n\n".join(t for t in page_texts if t.strip())
     sections = ([OCRSection(name=OCR_FULLTEXT_SECTION, text=combined)] if combined else []) + pages
     return OCRResponse(
-        doc_id=doc_id, sections=sections, tables=[], metadata={"page_count": len(page_texts)}
+        doc_id=doc_id,
+        sections=sections,
+        tables=[],
+        pages=[
+            OCRPage(page_number=i + 1, blocks=[OCRBlock(ref="text", bbox=None, text=t)])
+            for i, t in enumerate(page_texts)
+        ],
+        metadata={"page_count": len(page_texts)},
     )
 
 
@@ -65,6 +74,7 @@ class FakeOCRTool:
             "doc_id": outcome.doc_id,
             "sections": [s.model_dump(mode="json") for s in outcome.sections],
             "tables": [],
+            "pages": [p.model_dump(mode="json") for p in outcome.pages],
             "metadata": outcome.metadata,
             "artifacts": {"json_path": json_path, "markdown_path": None},
         }
@@ -115,6 +125,7 @@ def test_page_sections_drift_raises() -> None:
         doc_id="d1",
         sections=[OCRSection(name="Page 1", text="x")],
         tables=[],
+        pages=[OCRPage(page_number=1, blocks=[]), OCRPage(page_number=2, blocks=[])],
         metadata={"page_count": 2},
     )
     with pytest.raises(OCRContractError, match="contract violated"):

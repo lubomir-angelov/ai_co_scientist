@@ -1,0 +1,40 @@
+# Voice service: Kokoro-82M TTS + faster-whisper STT (GPU, co-resident with the llm; budget <= 3000 MiB).
+# Standalone: make -C services/voice up
+name: ai-co-voice
+
+services:
+  voice:
+    build:
+      context: ../..
+      dockerfile: services/voice/Dockerfile
+    restart: unless-stopped
+    environment:
+      VOICE_OCR_BASE_URL: ${VOICE_OCR_BASE_URL:-http://ocr:8002}
+      VOICE_OCR_TIMEOUT_SECONDS: ${VOICE_OCR_TIMEOUT_SECONDS:-60}
+      VOICE_DATA_DIR: /data
+      VOICE_TTS_VOICE: ${VOICE_TTS_VOICE:-af_heart}
+      VOICE_TTS_SPEED: ${VOICE_TTS_SPEED:-1.0}
+      VOICE_MAX_ACTIVE_STREAMS: ${VOICE_MAX_ACTIVE_STREAMS:-2}
+      VOICE_MAX_PENDING_TRANSCRIPTIONS: ${VOICE_MAX_PENDING_TRANSCRIPTIONS:-2}
+      VOICE_RENDER_QUEUE_MAX: ${VOICE_RENDER_QUEUE_MAX:-16}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    volumes:
+      # Host-visible so rendered MP3s can be synced to a phone. `make -C services/voice up` creates
+      # it first so it is owned by the host user (uid 1000), not root.
+      - ${VOICE_HOST_DATA_DIR:-../../data/voice}:/data
+    ports:
+      - "8007:8007"
+    gpus:
+      - device: 0
+    healthcheck:
+      # Passes while models load (process liveness); readiness is the `ready` field of /health.
+      test: ["CMD", "curl", "-sf", "http://localhost:8007/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 10
+      start_period: 120s
+
+networks:
+  default:
+    # Shared by every service compose file, so standalone services reach each other by name.
+    name: ai-co-scientist-network

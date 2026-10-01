@@ -109,6 +109,8 @@ COPY --from=builder /tmp/src/ /workspace/src/
 COPY ${SERVICES_DIR}/common/src/ /workspace/common_src/
 ENV PYTHONPATH=/workspace/common_src:/workspace/src
 
+# OCR-owned document store; created here so the named volume inherits inferenceuser ownership.
+RUN mkdir -p /workspace/documents
 RUN chown -R inferenceuser:inferenceuser /workspace /opt/inference-venv /opt/models
 
 ENV PATH="/opt/inference-venv/bin:${PATH}"

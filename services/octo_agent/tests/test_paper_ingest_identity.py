@@ -69,3 +69,12 @@ def test_discover_paper_id_collision_raises_naming_both_files(tmp_path: Path) ->
         discover(tmp_path)
     assert "2510.15511v1.pdf" in str(excinfo.value)
     assert "2510.15511v3.pdf" in str(excinfo.value)
+
+
+def test_filename_that_is_not_a_valid_doc_id_fails_identify_and_discover(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="a b.pdf"):
+        identify(Path("a b.pdf"))
+    _touch(tmp_path, "ok.pdf")
+    _touch(tmp_path, "a b.pdf")
+    with pytest.raises(ValueError, match="a b.pdf"):
+        discover(tmp_path)

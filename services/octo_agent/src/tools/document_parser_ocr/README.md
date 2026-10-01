@@ -14,7 +14,8 @@ URL (downloads bytes first)
 **Server interaction**
 
 ```
-Calls an OCR server endpoint and parses the OCRResponse schema (sections, tables, metadata)
+Calls an OCR server endpoint and parses the OCRResponse schema (sections, tables, typed pages/blocks, metadata). The full
+validated response, including `pages`, is what `save_artifacts` writes to `<doc_id>.json`.
 ```
 
 **Outputs**
@@ -25,6 +26,7 @@ doc_id
 markdown (concatenated sections)
 sections (name + text)
 tables
+pages (typed blocks per page)
 metadata
 ```
 

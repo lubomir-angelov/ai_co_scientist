@@ -1,7 +1,7 @@
 # Full AI co-scientist stack. Each service owns its compose file under services/<svc>/;
 # this file only composes them. Run a single service with: make -C services/<svc> up
 #
-#   make up                        -> llm, ocr, ocr-mcp, memory (thinking off)
+#   make up                        -> llm, ocr, ocr-mcp, memory, voice (thinking off)
 #   LLM_REASONING=on make up       -> same, with Qwen thinking on
 #   docker compose --profile agent up -d orchestrator
 name: ai-co-scientist
@@ -14,6 +14,7 @@ include:
   - services/ocr_mcp/compose.yaml
   - services/memory/compose.yaml
   - services/octo_agent/compose.yaml
+  - services/voice/compose.yaml
 
 networks:
   default:

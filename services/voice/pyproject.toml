@@ -1,0 +1,15 @@
+[project]
+name = "voice-service"
+version = "0.1.0"
+description = "Kokoro-82M TTS (file render + streaming) and faster-whisper STT for the AI co-scientist."
+requires-python = ">=3.12"
+
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src", "../common/src"]
+addopts = "-m 'not gpu'"
+markers = ["gpu: needs a CUDA GPU and the baked models; run inside the voice container"]

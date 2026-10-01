@@ -1,0 +1,9 @@
+# Light test deps: unit tests use fake backends, so torch / kokoro / faster-whisper are never imported.
+pytest==8.4.2
+httpx==0.28.1
+fastapi==0.115.4
+pydantic>=2.9
+numpy
+soundfile>=0.12.1
+pylatexenc==2.10
+huggingface_hub  # imported by scripts/fetch_models.py (build-time tool, drift-checked in unit tests)
