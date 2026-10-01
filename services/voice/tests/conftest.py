@@ -121,7 +121,7 @@ def make_config(tmp_path: Path, **overrides: object) -> VoiceConfig:
     manifest_path = tmp_path / "voice-models.json"
     manifest_path.write_text("{}", encoding="utf-8")
     env = {
-        "VOICE_OCR_BASE_URL": "http://ocr.test",
+        "VOICE_OCR_DOCUMENTS_BASE_URL": "http://ocr.test",
         "VOICE_OCR_TIMEOUT_SECONDS": "5",
         "VOICE_DATA_DIR": str(data_dir),
         "VOICE_MODELS_MANIFEST": str(manifest_path),

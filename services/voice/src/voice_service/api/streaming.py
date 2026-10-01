@@ -70,9 +70,7 @@ class _SessionStreamingResponse(StreamingResponse):
         super().__init__(body, media_type="audio/mpeg", headers=dict(headers))
         self._session = session
 
-    async def __call__(
-        self, scope: MutableMapping[str, Any], receive: Any, send: Any
-    ) -> None:
+    async def __call__(self, scope: MutableMapping[str, Any], receive: Any, send: Any) -> None:
         try:
             await super().__call__(scope, receive, send)
         finally:

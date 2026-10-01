@@ -34,8 +34,14 @@ class Harness:
         self.exit_recorder = exit_recorder
         self.registry = ModelRegistry(manifest, lambda: self.tts, FakeStt, exit_recorder)
         self.queue = RenderQueue(
-            store=self.store, registry=self.registry, gate=self.gate, queue_max=queue_max,
-            tts_model=manifest.tts.identity(), voice="af_heart", speed=1.0, exit_process=exit_recorder,
+            store=self.store,
+            registry=self.registry,
+            gate=self.gate,
+            queue_max=queue_max,
+            tts_model=manifest.tts.identity(),
+            voice="af_heart",
+            speed=1.0,
+            exit_process=exit_recorder,
         )
         self.store.save_script(build_script(load_ocr_fixture(), datetime.now(UTC)))
 
@@ -122,9 +128,7 @@ async def test_active_key_merges_new_indices(tmp_path: Path, exit_recorder: Exit
 async def test_full_queue_raises(tmp_path: Path, exit_recorder: ExitRecorder) -> None:
     h = Harness(tmp_path, exit_recorder, queue_max=1)
     await h.registry.load_all()
-    h.store.save_script(
-        build_script(load_ocr_fixture().model_copy(update={"doc_id": "paper-2"}), datetime.now(UTC))
-    )
+    h.store.save_script(build_script(load_ocr_fixture().model_copy(update={"doc_id": "paper-2"}), datetime.now(UTC)))
     await h.queue.submit(DOC, [1])
     with pytest.raises(RenderQueueFullError):
         await h.queue.submit("paper-2", [1])

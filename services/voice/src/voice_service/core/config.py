@@ -34,7 +34,7 @@ def _parse(name: str, raw: str, cast: type[int] | type[float]) -> int | float:
 
 @dataclass(frozen=True)
 class VoiceConfig:
-    ocr_base_url: str
+    ocr_documents_base_url: str
     ocr_timeout_seconds: float
     data_dir: Path
     models_manifest: Path
@@ -51,9 +51,11 @@ class VoiceConfig:
 
     @classmethod
     def from_mapping(cls, env: Mapping[str, str]) -> VoiceConfig:
-        ocr_base_url = _required(env, "VOICE_OCR_BASE_URL")
-        if not ocr_base_url.startswith(("http://", "https://")):
-            raise ConfigError(f"VOICE_OCR_BASE_URL={ocr_base_url!r} must start with http:// or https://")
+        ocr_documents_base_url = _required(env, "VOICE_OCR_DOCUMENTS_BASE_URL")
+        if not ocr_documents_base_url.startswith(("http://", "https://")):
+            raise ConfigError(
+                f"VOICE_OCR_DOCUMENTS_BASE_URL={ocr_documents_base_url!r} must start with http:// or https://"
+            )
 
         ocr_timeout = float(_parse("VOICE_OCR_TIMEOUT_SECONDS", _required(env, "VOICE_OCR_TIMEOUT_SECONDS"), float))
         if ocr_timeout <= 0:
@@ -79,7 +81,7 @@ class VoiceConfig:
             raise ConfigError(f"LOG_LEVEL={log_level!r} must be one of {sorted(level_names)}")
 
         return cls(
-            ocr_base_url=ocr_base_url.rstrip("/"),
+            ocr_documents_base_url=ocr_documents_base_url.rstrip("/"),
             ocr_timeout_seconds=ocr_timeout,
             data_dir=data_dir,
             models_manifest=models_manifest,

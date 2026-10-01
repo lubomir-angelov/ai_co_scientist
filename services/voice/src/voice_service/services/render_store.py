@@ -88,7 +88,9 @@ class RenderStore:
     def load_script(self, doc_id: str) -> PaperScript:
         script = self.find_script(doc_id)
         if script is None:
-            raise ScriptNotPreparedError(f"no script prepared for doc_id {doc_id!r}; POST /v1/papers/{{doc_id}}/script first")
+            raise ScriptNotPreparedError(
+                f"no script prepared for doc_id {doc_id!r}; POST /v1/papers/{{doc_id}}/script first"
+            )
         return script
 
     def list_scripts(self) -> list[PaperScript]:
@@ -151,7 +153,5 @@ class RenderStore:
             raise StoreIntegrityError(f"manifest says section {record.index} is rendered but {path} is missing")
         actual, _ = file_digest(path)
         if actual != record.sha256:
-            raise StoreIntegrityError(
-                f"{path} sha256 {actual} does not match the manifest's {record.sha256}"
-            )
+            raise StoreIntegrityError(f"{path} sha256 {actual} does not match the manifest's {record.sha256}")
         return path

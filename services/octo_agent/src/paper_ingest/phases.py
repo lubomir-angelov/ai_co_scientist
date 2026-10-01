@@ -25,6 +25,7 @@ from paper_ingest.identity import PaperIdentity, identify
 from paper_ingest.metadata import MetadataExtractionError, StructuredEngine, resolve_metadata
 from paper_ingest.state import IngestDone, OcrDone, PaperState, StageFailed, StateStore
 from service_errors import ServiceCallError
+from tools.document_parser_ocr.documents_client import OcrDocumentsClient
 
 logger = logging.getLogger(__name__)
 
@@ -194,12 +195,22 @@ def _log_paper_line(
 def run_ocr_phase(
     identities: list[PaperIdentity],
     tool: Any,
+    documents: OcrDocumentsClient,
     store: StateStore,
     ocr_timeout_seconds: float,
+    reocr: frozenset[str],
     clock: Callable[[], float] = time.monotonic,
 ) -> PhaseSummary:
-    """Phase 1: OCR every not-yet-done paper and validate its page-section contract."""
-    tool.set_custom_output_dir(str(store.ocr_dir))
+    """Phase 1: OCR every not-yet-done paper and validate its page-section contract.
+
+    ``reocr`` is the operator's explicit set of paper ids to OCR again even when state says done
+    (e.g. the stored document fails its integrity check); an id not among ``identities`` raises.
+    """
+    unknown_reocr = reocr - {identity.paper_id for identity in identities}
+    if unknown_reocr:
+        raise ValueError(
+            f"--reocr names paper ids not found in the input dir: {sorted(unknown_reocr)}"
+        )
     total = len(identities)
     outcomes: list[PaperOutcome] = []
     counts = {"done": 0, "failed": 0, "blocked": 0}
@@ -213,7 +224,22 @@ def run_ocr_phase(
             state = PaperState(paper_id=paper_id, source_file=str(identity.source_path))
         remaining = total - index
 
-        if isinstance(state.ocr, OcrDone):
+        # The OCR store is the authority: OcrDone only counts while the store holds the document.
+        # The fetch runs outside the per-paper try, so a reader failure aborts the run instead of
+        # being recorded as a StageFailed that would overwrite a valid OcrDone. A forced re-OCR
+        # never fetches: the stored document may be the corrupt one.
+        forced = paper_id in reocr
+        if forced:
+            logger.info("%s: forced re-OCR (--reocr)", paper_id)
+        stored_doc = (
+            documents.fetch(paper_id) if isinstance(state.ocr, OcrDone) and not forced else None
+        )
+        if isinstance(state.ocr, OcrDone) and not forced and stored_doc is None:
+            logger.warning(
+                "%s: state says OCR done but the OCR store has no document — re-OCRing", paper_id
+            )
+
+        if isinstance(state.ocr, OcrDone) and stored_doc is not None:
             outcomes.append(
                 PaperOutcome(paper_id, "ocr", "already_done", state.ocr.page_count, None)
             )
@@ -239,9 +265,9 @@ def run_ocr_phase(
                 input_path_or_url=str(identity.source_path),
                 doc_id=paper_id,
                 timeout_s=ocr_timeout_seconds,
-                save_artifacts=True,
+                save_artifacts=False,
             )
-            _assert_ocr_output_matches_layout(result, paper_id, store)
+            _assert_ocr_doc_id(result, paper_id)
             resp = OCRResponse.model_validate(
                 {
                     "doc_id": result["doc_id"],
@@ -315,15 +341,7 @@ def run_ocr_phase(
     return PhaseSummary(stage="ocr", outcomes=outcomes, wall_seconds=clock() - run_started)
 
 
-def _assert_ocr_output_matches_layout(
-    result: dict[str, Any], paper_id: str, store: StateStore
-) -> None:
-    expected_path = str(store.ocr_cache_path(paper_id))
-    if result["artifacts"]["json_path"] != expected_path:
-        raise AssertionError(
-            f"OCR tool wrote its cache to {result['artifacts']['json_path']!r}, "
-            f"expected {expected_path!r} — the tool is meant to be the only cache writer"
-        )
+def _assert_ocr_doc_id(result: dict[str, Any], paper_id: str) -> None:
     if result["doc_id"] != paper_id:
         raise AssertionError(
             f"OCR tool returned doc_id {result['doc_id']!r}, expected paper_id {paper_id!r}"
@@ -333,6 +351,7 @@ def _assert_ocr_output_matches_layout(
 def run_ingest_phase(
     engine: StructuredEngine,
     memory_tool: Any,
+    documents: OcrDocumentsClient,
     store: StateStore,
     ingest_seconds_per_page: float,
     clock: Callable[[], float] = time.monotonic,
@@ -395,16 +414,32 @@ def run_ingest_phase(
             )
             continue
 
-        cache_path = store.ocr_cache_path(paper_id)
-        if not cache_path.is_file():
-            raise WorkDirIntegrityError(
-                f"{paper_id}: state says ocr.status=='done' but {cache_path} is missing; "
-                f"delete {store.state_path(paper_id)} to redo phase 1 for this paper"
+        # Fetched outside the per-paper try: a reader failure aborts the run and is never
+        # recorded as this paper's ingest failure.
+        resp = documents.fetch(paper_id)
+        if resp is None:
+            counts["blocked"] += 1
+            pages_remaining -= state.ocr.page_count
+            error = "OCR store has no document (state says OCR done) — rerun papers-ocr"
+            outcomes.append(PaperOutcome(paper_id, "ingest", "blocked", None, None, error))
+            _log_paper_line(
+                index=index,
+                total=total,
+                paper_id=paper_id,
+                stage="ingest",
+                verb="blocked",
+                pages=None,
+                seconds=None,
+                counts=counts,
+                remaining=remaining,
+                remaining_pages=pages_remaining,
+                eta_seconds=eta.estimate(pages_remaining),
+                eta_unit="page",
             )
+            continue
 
         started = clock()
         try:
-            resp = OCRResponse.model_validate_json(cache_path.read_text(encoding="utf-8"))
             pages = page_sections(resp)
 
             if state.meta is None:

@@ -10,6 +10,7 @@ of the full stack.
 |---|---|---|
 | `services/llm/compose.yaml` (+ `compose.stack.yaml` in the stack) | `llm` (llama.cpp, CUDA), `llm-gateway` (API-key proxy) | 8000, 9000 |
 | `services/ocr/compose.yaml` | `ocr` (DeepSeek-OCR, CUDA) | 8002 |
+| `services/ocr/compose.yaml` | `ocr-documents` (GPU-free reader of the OCR document volume, read-only) | 8008 |
 | `services/ocr_mcp/compose.yaml` | `ocr-mcp` (MCP over streamable HTTP) | 8003 |
 | `services/memory/compose.yaml` | `falkordb`, `embeddings` (llama.cpp, CPU), `memory` | 6379, 8006, 8005 |
 | `services/octo_agent/compose.yaml` | `orchestrator` (opt-in profile `agent`) | 8001 |
@@ -58,13 +59,13 @@ From the repo root:
 
 ```bash
 make build            # build all images (the OCR image is large)
-make up               # llm, llm-gateway, ocr, ocr-mcp, falkordb, embeddings, memory
+make up               # llm, llm-gateway, ocr, ocr-documents, ocr-mcp, falkordb, embeddings, memory
 make health           # check every endpoint
 make ps / make logs
 make down
 
 LLM_REASONING=on make up          # full stack with Qwen thinking on
-make llm-up | memory-up | ocr-up | ocr-mcp-up   # parts of the stack (and matching -down)
+make llm-up | memory-up | ocr-up | ocr-documents-up | ocr-mcp-up   # parts of the stack (and matching -down)
 make agent-up                     # orchestrator (opt-in)
 ```
 

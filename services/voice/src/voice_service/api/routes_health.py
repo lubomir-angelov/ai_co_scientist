@@ -19,7 +19,5 @@ async def health(services: Annotated[Services, Depends(get_services)]) -> Health
         ready=registry.tts_loaded and registry.stt_loaded,
         tts_loaded=registry.tts_loaded,
         stt_loaded=registry.stt_loaded,
-        models=HealthModels(
-            tts=registry.manifest.tts.identity(), stt=registry.manifest.stt.identity()
-        ),
+        models=HealthModels(tts=registry.manifest.tts.identity(), stt=registry.manifest.stt.identity()),
     )

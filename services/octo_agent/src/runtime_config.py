@@ -16,6 +16,7 @@ _DEFAULT_LLM_API_KEY = "local-llm"
 _DEFAULT_LLM_MODEL = "Qwen3.8-27B-UD-Q4_K_XL"
 _DEFAULT_LLM_REQUEST_TIMEOUT_SECONDS = 300.0
 _DEFAULT_OCR_BASE_URL = "http://localhost:8002"
+_DEFAULT_OCR_DOCUMENTS_BASE_URL = "http://localhost:8008"
 _DEFAULT_OCR_REQUEST_TIMEOUT_SECONDS = 3600.0
 _DEFAULT_MEMORY_BASE_URL = "http://localhost:8005"
 _DEFAULT_MEMORY_REQUEST_TIMEOUT_SECONDS = 600.0
@@ -64,6 +65,7 @@ class RuntimeConfig:
     llm_model: str
     llm_request_timeout_seconds: float
     ocr_base_url: str
+    ocr_documents_base_url: str
     ocr_auth_header: str | None
     ocr_request_timeout_seconds: float
     memory_base_url: str
@@ -79,6 +81,9 @@ class RuntimeConfig:
                 "LLM_REQUEST_TIMEOUT_SECONDS", _DEFAULT_LLM_REQUEST_TIMEOUT_SECONDS
             ),
             ocr_base_url=_read_str("OCR_BASE_URL", _DEFAULT_OCR_BASE_URL),
+            ocr_documents_base_url=_read_str(
+                "OCR_DOCUMENTS_BASE_URL", _DEFAULT_OCR_DOCUMENTS_BASE_URL
+            ),
             ocr_auth_header=_read_optional_str("OCR_AUTH_HEADER"),
             ocr_request_timeout_seconds=_read_float(
                 "OCR_REQUEST_TIMEOUT_SECONDS", _DEFAULT_OCR_REQUEST_TIMEOUT_SECONDS

@@ -184,16 +184,18 @@ INGEST_SECONDS_PER_PAGE ?= 300
 # How long to wait for the required GPU tenant / memory to become ready after `up`.
 READY_TIMEOUT_SECONDS ?= 900
 EXCLUDE ?=
+REOCR ?=
 
 .PHONY: papers-ocr
-papers-ocr: install ## Phase 1: OCR every PDF in INPUT_DIR into INGEST_WORK_DIR (LLM must be down)
+papers-ocr: install ## Phase 1: OCR every PDF in INPUT_DIR (stored by the OCR service; state in INGEST_WORK_DIR; LLM must be down)
 	$(if $(INPUT_DIR),,$(error INPUT_DIR is required))
 	@$(PYTHON) -m paper_ingest ocr --input-dir "$(INPUT_DIR)" --work-dir "$(INGEST_WORK_DIR)" \
 	  $(foreach f,$(EXCLUDE),--exclude '$(f)') \
+  $(foreach p,$(REOCR),--reocr '$(p)') \
 	  --ocr-timeout-seconds $(OCR_TIMEOUT_SECONDS) --ready-timeout-seconds $(READY_TIMEOUT_SECONDS)
 
 .PHONY: papers-ingest
-papers-ingest: install ## Phase 2: metadata + memory ingest from the OCR cache (OCR must be down)
+papers-ingest: install ## Phase 2: metadata + memory ingest from the OCR document store (OCR must be down)
 	@$(PYTHON) -m paper_ingest ingest --work-dir "$(INGEST_WORK_DIR)" \
 	  --ingest-seconds-per-page $(INGEST_SECONDS_PER_PAGE) --ready-timeout-seconds $(READY_TIMEOUT_SECONDS)
 

@@ -83,7 +83,9 @@ async def test_silence_only_unit_yields_pause_without_synthesis() -> None:
 async def test_first_chunk_is_available_before_the_rest() -> None:
     gate = GpuGate()
     tts = FakeTts(gate=gate)
-    chunks = synthesize_units(tts, gate, [SpeechUnit("a", 0.1), SpeechUnit("b", 0.0)], SynthesisStats(sample_rate=FAKE_SAMPLE_RATE))
+    chunks = synthesize_units(
+        tts, gate, [SpeechUnit("a", 0.1), SpeechUnit("b", 0.0)], SynthesisStats(sample_rate=FAKE_SAMPLE_RATE)
+    )
     first = await anext(chunks)
     assert len(first) == SAMPLES_PER_PHONEME and tts.synthesize_calls == ["a"]
     await chunks.aclose()
@@ -91,13 +93,18 @@ async def test_first_chunk_is_available_before_the_rest() -> None:
 
 def test_units_interleave_segments_and_omissions_in_source_order() -> None:
     section = ScriptSection(
-        index=0, heading="H", page_start=1, page_end=1, speakable=True,
+        index=0,
+        heading="H",
+        page_start=1,
+        page_end=1,
+        speakable=True,
         segments=[
             ScriptSegment(kind="heading", page_number=1, block_index=0, text="H"),
             ScriptSegment(kind="body", page_number=1, block_index=2, text="body"),
         ],
         omitted=[OmittedBlock(page_number=1, block_index=1, ref="table")],
-        math_spans_converted=0, spoken_char_count=5,
+        math_spans_converted=0,
+        spoken_char_count=5,
     )
     assert units_for_section(section) == [
         SpeechUnit("H", HEADING_PAUSE_SECONDS),

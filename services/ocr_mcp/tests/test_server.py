@@ -52,7 +52,9 @@ async def test_expected_tools_are_registered() -> None:
     assert {"ocr_extract_pdf", "ocr_health"} <= tools
 
 
-async def test_call_ocr_posts_to_configured_service(ocr_requests: list[httpx.Request]) -> None:
+async def test_call_ocr_posts_to_configured_service(
+    ocr_requests: list[httpx.Request],
+) -> None:
     result = await server._call_ocr("ZmFrZQ==", "doc-1")
 
     assert result["doc_id"] == "doc-1"
@@ -61,7 +63,9 @@ async def test_call_ocr_posts_to_configured_service(ocr_requests: list[httpx.Req
     assert json.loads(request.content) == {"doc_id": "doc-1", "content_b64": "ZmFrZQ=="}
 
 
-async def test_health_tool_reports_unhealthy_ocr(ocr_requests: list[httpx.Request]) -> None:
+async def test_health_tool_reports_unhealthy_ocr(
+    ocr_requests: list[httpx.Request],
+) -> None:
     app = server.create_app()
     result = await app.call_tool("ocr_health", {})
 
@@ -69,3 +73,33 @@ async def test_health_tool_reports_unhealthy_ocr(ocr_requests: list[httpx.Reques
     structured = result[1] if isinstance(result, tuple) else result
     assert structured["ready"] is False
     assert structured["status"] == "error"
+
+
+async def _tool_schemas() -> dict[str, dict]:
+    return {t.name: t.inputSchema for t in await server.create_app().list_tools()}
+
+
+async def test_doc_id_is_required_on_pdf_and_image_tools() -> None:
+    schemas = await _tool_schemas()
+    for name in ("ocr_extract_pdf", "ocr_extract_image"):
+        assert "doc_id" in schemas[name]["required"], name
+
+
+async def test_extract_file_posts_filename_when_doc_id_is_none(
+    ocr_requests: list[httpx.Request], tmp_path
+) -> None:
+    pdf = tmp_path / "paper.pdf"
+    pdf.write_bytes(b"%PDF-1.4 fake")
+    tools = {t.name: t for t in server.create_app()._tool_manager.list_tools()}
+
+    await tools["ocr_extract_file"].fn(file_path=str(pdf), doc_id=None)
+    await tools["ocr_extract_file"].fn(file_path=str(pdf), doc_id="x")
+
+    assert [json.loads(r.content)["doc_id"] for r in ocr_requests] == ["paper.pdf", "x"]
+
+
+def test_sections_markdown_format_and_missing_key() -> None:
+    payload = {"sections": [{"name": "A", "text": "one"}, {"name": "B", "text": "two"}]}
+    assert server._sections_markdown(payload) == "## A\n\none\n\n## B\n\ntwo"
+    with pytest.raises(KeyError):
+        server._sections_markdown({"sections": [{"name": "A"}]})

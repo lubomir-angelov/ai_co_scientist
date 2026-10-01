@@ -12,8 +12,9 @@ the image at build time; the runtime is offline (`HF_HUB_OFFLINE=1`).
 
 ## Workflow: prepare, then render or stream
 
-1. **Prepare** (needs the OCR service up): `POST /v1/papers/{doc_id}/script` fetches the stored OCR
-   document (`GET /ocr/documents/{doc_id}` on the OCR service) and builds a **script**: logical
+1. **Prepare**: `POST /v1/papers/{doc_id}/script` fetches the stored OCR document
+   (`GET /ocr/documents/{doc_id}` from the GPU-free `ocr-documents` reader at
+   `VOICE_OCR_DOCUMENTS_BASE_URL`; preparing a paper no longer requires the OCR GPU tenant) and builds a **script**: logical
    sections opened by heading blocks, tables / figures / display equations / captions omitted by
    their OCR block type, HTML markup stripped (`<sup>` becomes Unicode superscripts), inline LaTeX
    converted to Unicode. Citation numbers are spoken as written (see Known limitations). The script is stored in voice; preparing again is idempotent (`unchanged`).

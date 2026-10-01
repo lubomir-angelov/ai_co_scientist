@@ -12,7 +12,7 @@ LLM_API_KEY ?= local-llm
 export LLM_API_KEY
 
 .PHONY: help up down build restart logs ps health install test lint format \
-        agent-up agent-down llm-up llm-down ocr-up ocr-down ocr-mcp-up ocr-mcp-down \
+        agent-up agent-down llm-up llm-down ocr-up ocr-down ocr-documents-up ocr-documents-down ocr-mcp-up ocr-mcp-down \
         ocr-mcp-build memory-up memory-down memory-build voice-up voice-down voice-build \
         papers-ocr papers-ingest papers-status papers-all
 
@@ -26,7 +26,7 @@ help:
 	@echo "  make agent-up / down   - start / stop the orchestrator (opt-in 'agent' profile)"
 	@echo ""
 	@echo "Single services within the stack:"
-	@echo "  make llm-up|ocr-up|ocr-mcp-up|memory-up|voice-up  (and matching -down)"
+	@echo "  make llm-up|ocr-up|ocr-documents-up|ocr-mcp-up|memory-up|voice-up  (and matching -down)"
 	@echo "  make ocr-mcp-build / memory-build / voice-build"
 	@echo ""
 	@echo "Development (per-service virtualenvs):"
@@ -36,7 +36,7 @@ help:
 	@echo "  make format            - ruff format services/"
 	@echo ""
 	@echo "Paper ingestion (two-phase, resumable; swaps the OCR/LLM GPU tenant for you):"
-	@echo "  make papers-ocr INPUT_DIR=... [EXCLUDE='a.pdf b.pdf']  - Phase 1: OCR every PDF"
+	@echo "  make papers-ocr INPUT_DIR=... [EXCLUDE='a.pdf b.pdf'] [REOCR='paper_id ...']  - Phase 1: OCR every PDF"
 	@echo "  make papers-ingest                                    - Phase 2: metadata + memory ingest"
 	@echo "  make papers-all INPUT_DIR=... [EXCLUDE='a.pdf b.pdf']  - Phase 1 then phase 2, one invocation"
 	@echo "  make papers-status                                    - show per-paper state"
@@ -66,6 +66,8 @@ health:
 	curl -sf -H "Authorization: Bearer $(LLM_API_KEY)" http://localhost:9000/v1/models > /dev/null && echo "OK" || echo "FAIL"
 	@echo "=== OCR ===" && \
 	curl -sf http://localhost:8002/healthz && echo "" || echo "FAIL"
+	@echo "=== OCR documents ===" && \
+	curl -sf http://localhost:8008/healthz && echo "" || echo "FAIL"
 	@echo "=== OCR MCP ===" && \
 	docker compose exec -T ocr-mcp python -c "import socket; socket.create_connection(('localhost', 8003), 3)" \
 	  2>/dev/null && echo "OK" || echo "FAIL"
@@ -95,6 +97,14 @@ ocr-up:
 
 ocr-down:
 	docker compose stop ocr
+
+# GPU-free OCR document reader (:8008): the only server of GET /ocr/documents/{doc_id}.
+# Needed by paper ingest (both phases) and voice; it stays up while the LLM owns the GPU.
+ocr-documents-up:
+	docker compose up -d ocr-documents
+
+ocr-documents-down:
+	docker compose stop ocr-documents
 
 ocr-mcp-build:
 	docker compose build ocr ocr-mcp
@@ -150,15 +160,17 @@ format:
 
 # ---- Paper ingestion (sequences the GPU tenant on the host, then delegates) --------------
 
-papers-ocr:     ## Phase 1: stop LLM, start OCR, OCR all PDFs (INPUT_DIR=..., EXCLUDE=...)
+papers-ocr:     ## Phase 1: stop LLM, start OCR + document reader, OCR all PDFs (INPUT_DIR=..., EXCLUDE=..., REOCR=...)
 	$(MAKE) llm-down
 	$(MAKE) ocr-up
+	$(MAKE) ocr-documents-up
 	$(MAKE) -C services/octo_agent papers-ocr
 
-papers-ingest:  ## Phase 2: stop OCR, start LLM + memory, extract metadata and ingest
+papers-ingest:  ## Phase 2: stop OCR, start LLM + memory + document reader, extract metadata and ingest
 	$(MAKE) ocr-down
 	$(MAKE) llm-up
 	$(MAKE) memory-up
+	$(MAKE) ocr-documents-up
 	$(MAKE) -C services/octo_agent papers-ingest
 
 # The leading `-` ignores papers-ocr's exit status: it exits non-zero when even one paper

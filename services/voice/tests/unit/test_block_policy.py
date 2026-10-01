@@ -4,7 +4,15 @@ from voice_service.core.errors import UnknownBlockRefError
 from voice_service.services.block_policy import BLOCK_POLICY, BlockDisposition, disposition
 
 OBSERVED_REFS = [
-    "text", "sub_title", "title", "image", "image_caption", "equation", "table", "table_caption", "table_footnote",
+    "text",
+    "sub_title",
+    "title",
+    "image",
+    "image_caption",
+    "equation",
+    "table",
+    "table_caption",
+    "table_footnote",
 ]
 
 

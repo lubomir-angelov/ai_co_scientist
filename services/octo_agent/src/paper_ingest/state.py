@@ -1,8 +1,9 @@
 """Per-paper resumable state — the one source of truth for what stage each paper is in.
 
 ``StateStore`` is the only writer of state files and the only deriver of the work-directory
-layout (``ocr_cache_path`` / ``state_path`` / ``lock_path``), so nothing else in the batch
-re-derives these paths (CLAUDE.md §6). Writes are atomic (tmp file + ``os.replace``), so a
+layout (``state_path`` / ``lock_path``), so nothing else in the batch re-derives these paths
+(CLAUDE.md §6). OCR documents are owned by the OCR service and read via ``ocr-documents``;
+the work dir holds no OCR copy. Writes are atomic (tmp file + ``os.replace``), so a
 crash mid-write never leaves a half-written state file for the next run to misread.
 """
 
@@ -71,15 +72,11 @@ class StateStore:
     def __init__(self, work_dir: Path) -> None:
         self.work_dir = work_dir
         self.state_dir = work_dir / "state"
-        self.ocr_dir = work_dir / "ocr"
         self.logs_dir = work_dir / "logs"
         self.state_dir.mkdir(parents=True, exist_ok=True)
 
     def state_path(self, paper_id: str) -> Path:
         return self.state_dir / f"{paper_id}.json"
-
-    def ocr_cache_path(self, paper_id: str) -> Path:
-        return self.ocr_dir / f"{paper_id}.json"
 
     def lock_path(self) -> Path:
         return self.work_dir / ".lock"

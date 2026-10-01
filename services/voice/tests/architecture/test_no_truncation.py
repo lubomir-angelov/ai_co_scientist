@@ -85,7 +85,7 @@ def test_allowlist_entries_are_live() -> None:
 
 
 def test_guard_flags_planted_violations() -> None:
-    planted = '''
+    planted = """
 import textwrap
 def a(x):
     return x[:80]
@@ -103,7 +103,7 @@ def g(x):
     return list(islice(x, 5))
 def h(x):
     return list(itertools.islice(x, 5))
-'''
+"""
     assert [h.symbol for h in scan_truncation(planted, "p.py", frozenset())] == ["a", "b", "c", "d", "e", "f", "g", "h"]
 
 

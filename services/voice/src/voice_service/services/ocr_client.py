@@ -4,11 +4,15 @@ from __future__ import annotations
 
 import logging
 import time
-from urllib.parse import quote
 
 import httpx
 from pydantic import ValidationError
-from shared_library.data_contracts import OCRResponse
+from shared_library.data_contracts import (
+    OCRResponse,
+    OcrDocumentError,
+    OcrDocumentErrorCode,
+    ocr_document_path,
+)
 
 from voice_service.core.errors import (
     OcrContractError,
@@ -30,7 +34,7 @@ class OcrDocumentClient:
         self._http = http
 
     async def fetch(self, doc_id: str) -> OCRResponse:
-        path = f"/ocr/documents/{quote(doc_id, safe='')}"
+        path = ocr_document_path(doc_id)
         started = time.perf_counter()
         try:
             response = await self._http.get(path)
@@ -51,7 +55,25 @@ class OcrDocumentClient:
             },
         )
         if response.status_code == 404:
+            try:
+                error = OcrDocumentError.model_validate_json(response.content)
+            except ValidationError as exc:
+                raise OcrServiceError(
+                    f"OCR documents reader returned a 404 that is not its typed error body for {doc_id!r}"
+                    " - wrong OCR documents base URL?"
+                ) from exc
+            if error.code is not OcrDocumentErrorCode.NOT_FOUND:
+                raise OcrServiceError(
+                    f"OCR documents reader returned 404 with error code {error.code.value!r} for {doc_id!r}"
+                )
             raise OcrDocumentNotFoundError(f"OCR service has no stored document for {doc_id!r}")
+        if response.status_code == 500:
+            try:
+                error = OcrDocumentError.model_validate_json(response.content)
+            except ValidationError:
+                error = None
+            if error is not None and error.code is OcrDocumentErrorCode.INTEGRITY:
+                raise OcrServiceError(f"OCR stored document for {doc_id!r} is corrupt ({error.code.value}); re-OCR it")
         if response.status_code != 200:
             raise OcrServiceError(f"OCR service returned status {response.status_code} for {doc_id!r}")
         try:

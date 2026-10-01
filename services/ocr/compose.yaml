@@ -2,15 +2,19 @@
 # Standalone: make -C services/ocr up
 name: ai-co-ocr
 
+# One build definition; `ocr` and `ocr-documents` run the same image.
+x-ocr-build: &ocr-build
+  context: ../..
+  dockerfile: services/ocr/Dockerfile
+  args:
+    BASE_IMAGE: nvidia/cuda:12.8.1-cudnn-devel-ubuntu22.04
+    SERVICES_DIR: services
+    SERVICE_NAME: ocr
+
 services:
   ocr:
-    build:
-      context: ../..
-      dockerfile: services/ocr/Dockerfile
-      args:
-        BASE_IMAGE: nvidia/cuda:12.8.1-cudnn-devel-ubuntu22.04
-        SERVICES_DIR: services
-        SERVICE_NAME: ocr
+    build: *ocr-build
+    image: ai-co-scientist/ocr:local
     environment:
       CUDA_VISIBLE_DEVICES: "0"
       HF_HOME: /workspace/hf-cache
@@ -30,8 +34,28 @@ services:
       retries: 10
       start_period: 120s
 
+  # GPU-free reader of the document volume: the ONLY server of GET /ocr/documents/{doc_id}.
+  # Stays up while the GPU is tenanted by the LLM (paper ingest phase 2, voice prepare).
+  ocr-documents:
+    build: *ocr-build
+    image: ai-co-scientist/ocr:local
+    restart: unless-stopped
+    command: ["uvicorn", "src.document_server:app", "--host", "0.0.0.0", "--port", "8008", "--no-access-log"]
+    environment:
+      OCR_DOCUMENTS_DIR: /workspace/documents
+    volumes:
+      - ocr-documents:/workspace/documents:ro
+    ports:
+      - "8008:8008"
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8008/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
 volumes:
-  # Every finished OCRResponse, served by GET /ocr/documents/{doc_id}.
+  # Every finished OCRResponse, written by `ocr`, served read-only by `ocr-documents`.
   ocr-documents:
 
 networks:

@@ -23,7 +23,9 @@ STT_CLIP_SECONDS = 60
 def _process_vram_mib() -> int:
     out = subprocess.run(
         ["nvidia-smi", "--query-compute-apps=pid,used_memory", "--format=csv,noheader,nounits"],
-        check=True, capture_output=True, text=True,
+        check=True,
+        capture_output=True,
+        text=True,
     ).stdout
     rows = [line.split(",") for line in out.strip().splitlines()]
     return sum(int(mem) for pid, mem in rows if int(pid) == os.getpid())

@@ -1,6 +1,7 @@
 import httpx
 import pytest
 from conftest import load_ocr_fixture
+from shared_library.data_contracts import OcrDocumentError, OcrDocumentErrorCode
 
 from voice_service.core.errors import (
     OcrContractError,
@@ -11,6 +12,10 @@ from voice_service.core.errors import (
 from voice_service.services.ocr_client import OcrDocumentClient
 
 pytestmark = pytest.mark.anyio
+
+
+def _error_body(code: OcrDocumentErrorCode, doc_id: str) -> dict:
+    return OcrDocumentError(code=code, doc_id=doc_id).model_dump(mode="json")
 
 
 def client_for(handler) -> OcrDocumentClient:
@@ -35,7 +40,7 @@ async def test_doc_id_is_path_quoted() -> None:
 
     def handler(request: httpx.Request) -> httpx.Response:
         seen.append(request.url.raw_path.decode())
-        return httpx.Response(404)
+        return httpx.Response(404, json=_error_body(OcrDocumentErrorCode.NOT_FOUND, "a?b#c"))
 
     with pytest.raises(OcrDocumentNotFoundError):
         await client_for(handler).fetch("a?b#c")
@@ -44,7 +49,20 @@ async def test_doc_id_is_path_quoted() -> None:
 
 async def test_404_maps_to_not_found() -> None:
     with pytest.raises(OcrDocumentNotFoundError):
-        await client_for(lambda r: httpx.Response(404, json={"code": "document_not_found"})).fetch("x")
+        await client_for(lambda r: httpx.Response(404, json=_error_body(OcrDocumentErrorCode.NOT_FOUND, "x"))).fetch(
+            "x"
+        )
+
+
+async def test_bare_404_is_a_service_error_not_a_missing_document() -> None:
+    with pytest.raises(OcrServiceError, match="not its typed error body"):
+        await client_for(lambda r: httpx.Response(404, json={"detail": "Not Found"})).fetch("x")
+
+
+async def test_500_integrity_error_names_the_corrupt_document() -> None:
+    body = _error_body(OcrDocumentErrorCode.INTEGRITY, "x")
+    with pytest.raises(OcrServiceError, match="corrupt"):
+        await client_for(lambda r: httpx.Response(500, json=body)).fetch("x")
 
 
 async def test_500_maps_to_service_error() -> None:

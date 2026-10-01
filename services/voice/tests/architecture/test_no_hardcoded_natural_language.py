@@ -22,7 +22,9 @@ _ALLOWLIST: frozenset[tuple[str, str]] = frozenset()
 
 
 def _word(node: ast.expr) -> bool:
-    return isinstance(node, ast.Constant) and isinstance(node.value, str) and node.value.isalpha() and node.value.islower()
+    return (
+        isinstance(node, ast.Constant) and isinstance(node.value, str) and node.value.isalpha() and node.value.islower()
+    )
 
 
 class _NlScanner(SymbolWalker):
@@ -104,7 +106,7 @@ def test_dict_literals_are_not_word_lists() -> None:
 
 
 def test_guard_flags_planted_violations() -> None:
-    planted = '''
+    planted = """
 import re
 STOP = ["the", "a", "of"]
 KEYS = {"alpha", "beta", "gamma"}
@@ -114,7 +116,7 @@ def g(text):
     return re.compile(r"\\bword\\b").findall(text)
 def h(text):
     return re.search("[a-z]+", text)
-'''
+"""
     details = [h.detail for h in scan_language(planted, "services/text_normalizer.py", frozenset())]
     assert details.count("literal of lowercase words (keyword list)") == 2
     assert details.count("len(... .split()) word counting") == 1
@@ -123,13 +125,13 @@ def h(text):
 
 
 def test_guard_accepts_structural_code() -> None:
-    structural = '''
+    structural = """
 from typing import Literal
 Kind = Literal["created", "rebuilt", "unchanged"]
 PAIRS = (("a", "b"), ("c", "d"))
 def f(x: str) -> list[str]:
     return x.split(",")
-'''
+"""
     assert scan_language(structural, "services/other.py", frozenset()) == []
 
 

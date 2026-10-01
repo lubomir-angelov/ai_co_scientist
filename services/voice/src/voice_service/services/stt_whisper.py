@@ -26,9 +26,7 @@ class WhisperStt:
     def load(cls, manifest: ModelManifest) -> WhisperStt:
         if not torch.cuda.is_available():
             raise ModelLoadError("CUDA requested but unavailable")
-        model = WhisperModel(
-            str(manifest.stt.model_dir), device=CUDA_DEVICE, compute_type=manifest.stt.compute_type
-        )
+        model = WhisperModel(str(manifest.stt.model_dir), device=CUDA_DEVICE, compute_type=manifest.stt.compute_type)
         return cls(model)
 
     def transcribe(self, audio_path: Path, language: str | None) -> Transcript:
@@ -39,9 +37,7 @@ class WhisperStt:
                 beam_size=WHISPER_BEAM_SIZE,
                 vad_filter=WHISPER_VAD_FILTER,
             )
-            consumed = [
-                TranscriptionSegment(start=seg.start, end=seg.end, text=seg.text) for seg in segments
-            ]
+            consumed = [TranscriptionSegment(start=seg.start, end=seg.end, text=seg.text) for seg in segments]
         except av.error.FFmpegError as exc:
             raise AudioDecodeError(f"audio could not be decoded: {exc}") from exc
         return Transcript(

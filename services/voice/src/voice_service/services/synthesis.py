@@ -49,9 +49,7 @@ def units_for_section(section: ScriptSection) -> list[SpeechUnit]:
         pause = HEADING_PAUSE_SECONDS if seg.kind == "heading" else SEGMENT_PAUSE_SECONDS
         ordered.append((seg.page_number, seg.block_index, SpeechUnit(seg.text, pause)))
     for omitted in section.omitted:
-        ordered.append(
-            (omitted.page_number, omitted.block_index, SpeechUnit("", OMITTED_BLOCK_PAUSE_SECONDS))
-        )
+        ordered.append((omitted.page_number, omitted.block_index, SpeechUnit("", OMITTED_BLOCK_PAUSE_SECONDS)))
     ordered.sort(key=lambda item: (item[0], item[1]))
     return [unit for _, _, unit in ordered]
 

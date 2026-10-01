@@ -67,9 +67,7 @@ def build_script(resp: OCRResponse, built_at: datetime) -> PaperScript:
             if kind is BlockDisposition.OMIT:
                 draft = _current_draft(drafts)
                 draft.pages.append(page.page_number)
-                draft.omitted.append(
-                    OmittedBlock(page_number=page.page_number, block_index=block_index, ref=block.ref)
-                )
+                draft.omitted.append(OmittedBlock(page_number=page.page_number, block_index=block_index, ref=block.ref))
                 continue
 
             normalized = normalize_block_text(block.text)

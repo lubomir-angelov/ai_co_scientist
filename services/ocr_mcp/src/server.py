@@ -14,6 +14,9 @@ logger = logging.getLogger(__name__)
 # Defaults - overridden by env vars at runtime
 _DEFAULT_OCR_BASE_URL = "http://localhost:8002"
 _DEFAULT_TIMEOUT = 300.0
+_DEFAULT_MCP_TRANSPORT = "streamable-http"
+_DEFAULT_MCP_HOST = "0.0.0.0"
+_DEFAULT_MCP_PORT = "8003"
 
 
 def _get_ocr_base_url() -> str:
@@ -37,6 +40,14 @@ async def _call_ocr(content_b64: str, doc_id: str) -> dict[str, Any]:
         return resp.json()
 
 
+def _sections_markdown(result: dict[str, Any]) -> str:
+    """Render an OCRResponse payload as markdown; a payload missing a contract key raises KeyError."""
+    combined = ""
+    for s in result["sections"]:
+        combined += f"## {s['name']}\n\n{s['text']}\n\n"
+    return combined.strip()
+
+
 def create_app() -> FastMCP:
     """Create and configure the MCP server instance."""
     mcp = FastMCP(
@@ -51,7 +62,7 @@ def create_app() -> FastMCP:
     @mcp.tool()
     async def ocr_extract_pdf(
         pdf_b64: str,
-        doc_id: str = "unknown",
+        doc_id: str,
     ) -> str:
         """Extract text from a PDF document given as base64-encoded bytes.
 
@@ -60,24 +71,19 @@ def create_app() -> FastMCP:
 
         Args:
             pdf_b64: Base64-encoded PDF file bytes.
-            doc_id: Optional identifier for the document (used in response metadata).
+            doc_id: Identifier the OCR service stores the result under; must be a legal OCR doc id
+                (the OCR service rejects an illegal one with HTTP 422).
 
         Returns:
             Markdown text extracted from the PDF.
         """
         result = await _call_ocr(content_b64=pdf_b64, doc_id=doc_id)
-        sections = result.get("sections", [])
-        combined = ""
-        for s in sections:
-            name = s.get("name", "Section")
-            text = s.get("text", "")
-            combined += f"## {name}\n\n{text}\n\n"
-        return combined.strip()
+        return _sections_markdown(result)
 
     @mcp.tool()
     async def ocr_extract_image(
         image_b64: str,
-        doc_id: str = "unknown",
+        doc_id: str,
     ) -> str:
         """Extract text from an image (PNG, JPEG, etc.) given as base64-encoded bytes.
 
@@ -85,19 +91,14 @@ def create_app() -> FastMCP:
 
         Args:
             image_b64: Base64-encoded image file bytes.
-            doc_id: Optional identifier for the document (used in response metadata).
+            doc_id: Identifier the OCR service stores the result under; must be a legal OCR doc id
+                (the OCR service rejects an illegal one with HTTP 422).
 
         Returns:
             Markdown text extracted from the image.
         """
         result = await _call_ocr(content_b64=image_b64, doc_id=doc_id)
-        sections = result.get("sections", [])
-        combined = ""
-        for s in sections:
-            name = s.get("name", "Section")
-            text = s.get("text", "")
-            combined += f"## {name}\n\n{text}\n\n"
-        return combined.strip()
+        return _sections_markdown(result)
 
     @mcp.tool()
     async def ocr_extract_file(
@@ -111,7 +112,7 @@ def create_app() -> FastMCP:
 
         Args:
             file_path: Absolute or relative path to the PDF or image file.
-            doc_id: Optional document identifier. Defaults to the filename.
+            doc_id: Optional document identifier. None means the filename is used.
 
         Returns:
             Markdown text extracted from the file.
@@ -121,7 +122,7 @@ def create_app() -> FastMCP:
             raise FileNotFoundError(f"File not found: {file_path}")
 
         raw = path.read_bytes()
-        file_doc_id = doc_id or path.name
+        file_doc_id = path.name if doc_id is None else doc_id
 
         # Detect PDF by magic bytes first, then extension fallback
         is_pdf = raw.startswith(b"%PDF-") or path.suffix.lower() == ".pdf"
@@ -152,23 +153,27 @@ def create_app() -> FastMCP:
                 return {"status": "ok", "service": "ocr", "ready": True}
             except httpx.HTTPError as e:
                 logger.warning("OCR health check failed: %s", e)
-                return {"status": "error", "service": "ocr", "ready": False, "detail": str(e)}
+                return {
+                    "status": "error",
+                    "service": "ocr",
+                    "ready": False,
+                    "detail": str(e),
+                }
 
     @mcp.resource("ocr://config")
     async def get_ocr_config() -> str:
         """Return the current OCR service configuration as text."""
         return (
-            f"OCR_BASE_URL={_get_ocr_base_url()}\n"
-            f"REQUEST_TIMEOUT={_get_timeout()}s\n"
+            f"OCR_BASE_URL={_get_ocr_base_url()}\nREQUEST_TIMEOUT={_get_timeout()}s\n"
         )
 
     return mcp
 
 
 if __name__ == "__main__":
-    transport = os.environ.get("MCP_TRANSPORT", "streamable-http")
-    host = os.environ.get("MCP_HOST", "0.0.0.0")
-    port = int(os.environ.get("MCP_PORT", "8003"))
+    transport = os.environ.get("MCP_TRANSPORT", _DEFAULT_MCP_TRANSPORT)
+    host = os.environ.get("MCP_HOST", _DEFAULT_MCP_HOST)
+    port = int(os.environ.get("MCP_PORT", _DEFAULT_MCP_PORT))
     mcp = create_app()
     # Override settings after creation since env vars may differ from defaults
     mcp.settings.host = host

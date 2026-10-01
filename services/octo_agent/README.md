@@ -72,18 +72,35 @@ make memory-down && make memory-up   # restart so Graphiti rebuilds its indices
 ```
 
 **Phase 1 (GPU = OCR).** For every PDF in `INPUT_DIR`, calls `Document_Parser_OCR_Tool`,
-caches the validated `OCRResponse` JSON under `<work-dir>/ocr/<paper_id>.json`, and records
-`ocr.status` in `<work-dir>/state/<paper_id>.json`. Requires the LLM gateway to be down (the
-root target stops it first). `OCRResponse.pages` is required: JSONs cached by an earlier OCR
-service version do not validate and are re-OCR'd on demand (delete the paper's OCR state and
-rerun).
+validates the `OCRResponse` and records `ocr.status` in `<work-dir>/state/<paper_id>.json`.
+The OCR service stores the document itself (its `ocr-documents` volume is the only copy; the
+work dir holds no OCR output). Requires the LLM gateway to be down (the root target stops it
+first) and the GPU-free `ocr-documents` reader up (`OCR_DOCUMENTS_BASE_URL`, default
+`http://localhost:8008`). The OCR store is the authority: a paper is skipped only when its
+state says OCR is done **and** the store holds its document. If the state says done but the
+store has none (a wiped volume, or OCR output cached by an earlier version), the paper is
+logged and re-OCR'd. A reader failure aborts the run; it is never recorded as a paper failure.
+Re-OCR cost: the 41 papers ingested before the store existed have no stored document, so the
+next `make papers-ocr` over `photonic/` re-OCRs them (about 421 pages at 37 s/page, roughly
+4.3 h of GPU). Phase 2 skips them (already ingested); limit the cost with `EXCLUDE=` or an
+`INPUT_DIR` subset.
+
+A paper whose stored OCR document fails the integrity check aborts both phases with a message
+naming the remedy: `make papers-ocr INPUT_DIR=... REOCR=<paper_id>`. This re-OCRs only that
+paper (`--reocr`, repeatable; an id not in `INPUT_DIR` fails fast) and atomically replaces its
+stored document. It does not re-ingest a paper that is already ingested. Re-OCR is never
+automatic. Operator step: the old `~/ai_cosc_paper_ingest/ocr` cache is unread by any code and can
+be deleted (`rm -rf ~/ai_cosc_paper_ingest/ocr`).
 
 **Phase 2 (GPU = LLM + memory).** For every paper whose OCR is done, resolves the title (and,
 absent a filename-derived date, the publication date) from page 1 via a structured LLM call
 grounded against the page text, then calls `Memory_Graph_Tool` `ingest_paper` with every page
 section (never `FullText`, which would duplicate every page). Metadata is resolved once and
 reused on every retry, because it is part of the memory episode's identity hash. Requires OCR
-to be down and the LLM + memory to be up (the root target sequences this).
+to be down and the LLM + memory + the `ocr-documents` reader to be up (the root target
+sequences this). It reads each paper's text from the reader. If the store has no document for
+an OCR-done paper, the paper is `blocked` (state untouched, error "rerun papers-ocr") and the
+next `papers-ocr` re-OCRs it.
 
 ```bash
 make papers-ocr INPUT_DIR=/path/to/pdfs EXCLUDE='skip-this.pdf another.pdf'

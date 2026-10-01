@@ -142,8 +142,8 @@ from an arXiv-style filename or page 1, else are left empty.
 
 The `ocr-mcp` service exposes the following tools via the MCP protocol on `http://localhost:8003/mcp`:
 
-- **`ocr_extract_pdf`** — Extract text from a base64-encoded PDF
-- **`ocr_extract_image`** — Extract text from a base64-encoded image
+- **`ocr_extract_pdf`** — Extract text from a base64-encoded PDF (`doc_id` is required)
+- **`ocr_extract_image`** — Extract text from a base64-encoded image (`doc_id` is required)
 - **`ocr_extract_file`** — Extract text from a PDF or image file on disk
 - **`ocr_health`** — Check the health of the underlying OCR service
 

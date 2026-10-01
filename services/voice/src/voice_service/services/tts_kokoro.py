@@ -77,4 +77,3 @@ class KokoroTts:
         with torch.inference_mode():
             audio = self._model(phonemes, self._voice_pack[len(phonemes) - 1], self._speed)
         return audio.cpu().numpy().astype(np.float32)
-

@@ -72,15 +72,34 @@ def _poll_until_ready(
         sleep(POLL_INTERVAL_SECONDS)
 
 
-def wait_ocr_ready(base_url: str, deadline_seconds: float, **poll_kwargs: Callable) -> None:
+def _healthz_ready_probe(url: str) -> Callable[[], tuple[bool, str]]:
+    """Probe for a service whose health endpoint answers 200 with a body carrying ``ready``."""
+
     def probe() -> tuple[bool, str]:
-        resp = requests.get(f"{base_url}/healthz", timeout=PROBE_TIMEOUT_SECONDS)
+        resp = requests.get(url, timeout=PROBE_TIMEOUT_SECONDS)
         if resp.status_code != 200:
             return False, f"HTTP {resp.status_code}: {resp.text}"
         body = resp.json()
         return body["ready"] is True, f"body: {body}"
 
-    _poll_until_ready("OCR service", probe, deadline_seconds, **poll_kwargs)
+    return probe
+
+
+def wait_ocr_ready(base_url: str, deadline_seconds: float, **poll_kwargs: Callable) -> None:
+    _poll_until_ready(
+        "OCR service", _healthz_ready_probe(f"{base_url}/healthz"), deadline_seconds, **poll_kwargs
+    )
+
+
+def wait_ocr_documents_ready(
+    base_url: str, deadline_seconds: float, **poll_kwargs: Callable
+) -> None:
+    _poll_until_ready(
+        "OCR document reader",
+        _healthz_ready_probe(f"{base_url}/healthz"),
+        deadline_seconds,
+        **poll_kwargs,
+    )
 
 
 def wait_llm_serving(
@@ -101,11 +120,9 @@ def wait_llm_serving(
 
 
 def wait_memory_ready(base_url: str, deadline_seconds: float, **poll_kwargs: Callable) -> None:
-    def probe() -> tuple[bool, str]:
-        resp = requests.get(f"{base_url}/health", timeout=PROBE_TIMEOUT_SECONDS)
-        if resp.status_code != 200:
-            return False, f"HTTP {resp.status_code}: {resp.text}"
-        body = resp.json()
-        return body["ready"] is True, f"body: {body}"
-
-    _poll_until_ready("Memory service", probe, deadline_seconds, **poll_kwargs)
+    _poll_until_ready(
+        "Memory service",
+        _healthz_ready_probe(f"{base_url}/health"),
+        deadline_seconds,
+        **poll_kwargs,
+    )

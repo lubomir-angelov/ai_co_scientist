@@ -10,9 +10,21 @@ time (the image is about 70 GB).
   typed blocks per page (`pages[].blocks[]`: DeepSeek-OCR's `ref` label, `bbox`, full `text`),
   and page metadata. The response is persisted before it is returned; a failed write is a 500
   `ocr_store_write_failed`.
+
+A second process, `ocr-documents` (same image, **no GPU**, port 8008, the volume mounted
+read-only), is the only server of:
+
 - `GET /ocr/documents/{doc_id}`: the stored `OCRResponse` for a doc id. 404
-  `{"code": "document_not_found"}` when none is stored; 500 `document_integrity_error` when
-  the stored file is invalid. Re-OCR of the same doc id replaces the stored document.
+  with an `OcrDocumentError` body (code `NOT_FOUND`) when none is stored; 500 (code `INTEGRITY`)
+  when the stored file is invalid. Route and error body are defined once in
+  `shared_library.data_contracts` (`OCR_DOCUMENTS_ROUTE`, `OcrDocumentError`). Re-OCR of the same doc id replaces the stored document.
+- `GET /healthz`: `{"status", "service": "ocr-documents", "ready"}`.
+
+The GPU `ocr` server only writes (`OcrDocumentWriter`); `ocr-documents` only reads
+(`OcrDocumentReader`); both derive the layout through `document_path`. The reader stays up while
+the LLM owns the GPU, so paper ingest (both phases) and voice read documents without the OCR
+GPU tenant. `tests/test_document_server_is_gpu_free.py` pins that `src/document_server.py`
+imports no GPU stack.
 
 Doc ids (`DocId` in `shared_library.data_contracts`) are non-empty and contain no `/` or
 whitespace. Documents live in the `OCR_DOCUMENTS_DIR` directory (`/workspace/documents`, the
@@ -22,9 +34,10 @@ is unset or the directory is missing or unwritable.
 ### Contract change: re-OCR of previously cached papers
 
 `OCRResponse.pages` is required and the truncated `metadata.layout_blocks` / `metadata.pages`
-previews are gone. OCR JSONs cached before this change (for example
-`<INGEST_WORK_DIR>/ocr/<paper_id>.json` from `make papers-ocr`) no longer validate and must be
-re-OCR'd on demand (`papers-ocr` is resumable); there is no compatibility path.
+previews are gone. OCR JSONs cached by older paper-ingest runs no longer validate, and paper ingest keeps no
+cache any more: papers are re-OCR'd on demand into the store (`papers-ocr` is resumable); there is
+no compatibility path. The old `~/ai_cosc_paper_ingest/ocr` directory is unread by any code;
+operators delete it by hand (`rm -rf ~/ai_cosc_paper_ingest/ocr`).
 
 Contracts live in `services/common/src/shared_library/data_contracts.py`.
 
@@ -33,8 +46,9 @@ Contracts live in `services/common/src/shared_library/data_contracts.py`.
 ```bash
 cd services/ocr
 make build     # docker image via compose.yaml (slow the first time)
-make up        # port 8002, GPU 0
+make up        # ocr on port 8002 (GPU 0) and ocr-documents on port 8008 (CPU)
 make health
+make health-documents
 make down
 ```
 

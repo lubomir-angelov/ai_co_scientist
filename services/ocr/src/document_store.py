@@ -1,7 +1,8 @@
 """OCR-owned persistent store of finished OCRResponse documents, addressed by doc id.
 
 Repository pattern: the OCR service owns its artifacts (AGENTS: "keep OCR artifacts inside
-OCR-owned storage"); other services read them through ``GET /ocr/documents/{doc_id}``.
+OCR-owned storage"); other services read them through ``GET /ocr/documents/{doc_id}`` on the GPU-free
+``ocr-documents`` reader process.
 """
 
 from __future__ import annotations
@@ -30,31 +31,62 @@ class DocumentIntegrityError(Exception):
     """The stored file does not hold a valid OCRResponse for the requested doc id."""
 
 
-class OcrDocumentStore:
+def documents_dir_from_env() -> Path:
+    """The OCR document store directory; the single reader of ``OCR_DOCUMENTS_DIR`` (both apps call it)."""
+    raw = os.environ.get("OCR_DOCUMENTS_DIR")
+    if not raw:
+        raise RuntimeError(
+            "OCR_DOCUMENTS_DIR must be set to the OCR document store directory"
+        )
+    return Path(raw)
+
+
+def document_path(root: Path, doc_id: str) -> Path:
+    """The single deriver of the on-disk layout: full sha256 hex of the doc id."""
+    return root / f"{hashlib.sha256(doc_id.encode('utf-8')).hexdigest()}.json"
+
+
+def _require_dir(root: Path) -> None:
+    if not root.is_dir():
+        raise RuntimeError(
+            f"OCR documents dir {str(root)!r} does not exist or is not a directory"
+        )
+
+
+class OcrDocumentWriter:
+    """Write capability, held only by the GPU ``ocr`` process."""
+
     def __init__(self, root: Path) -> None:
-        if not root.is_dir():
-            raise RuntimeError(f"OCR documents dir {str(root)!r} does not exist or is not a directory")
+        _require_dir(root)
         if not os.access(root, os.W_OK):
             raise RuntimeError(f"OCR documents dir {str(root)!r} is not writable")
         self._root = root
 
-    def path_for(self, doc_id: str) -> Path:
-        """The single deriver of the on-disk layout: full sha256 hex of the doc id."""
-        return self._root / f"{hashlib.sha256(doc_id.encode('utf-8')).hexdigest()}.json"
-
     def save(self, resp: OCRResponse) -> None:
         """Atomically persist ``resp``; a re-OCR of the same doc id replaces the old document."""
-        path = self.path_for(resp.doc_id)
+        path = document_path(self._root, resp.doc_id)
         replaced = path.exists()
         with atomic_replace(path) as tmp:
             tmp.write_text(resp.model_dump_json(), encoding="utf-8")
         logger.info(
             "stored OCR document",
-            extra={"doc_id": resp.doc_id, "replaced_existing": replaced, "pages": len(resp.pages)},
+            extra={
+                "doc_id": resp.doc_id,
+                "replaced_existing": replaced,
+                "pages": len(resp.pages),
+            },
         )
 
+
+class OcrDocumentReader:
+    """Read capability, held only by the GPU-free ``ocr-documents`` process (read-only mount)."""
+
+    def __init__(self, root: Path) -> None:
+        _require_dir(root)
+        self._root = root
+
     def load(self, doc_id: str) -> OCRResponse:
-        path = self.path_for(doc_id)
+        path = document_path(self._root, doc_id)
         try:
             raw = path.read_text(encoding="utf-8")
         except FileNotFoundError:

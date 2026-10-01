@@ -17,9 +17,16 @@ from pathlib import Path
 from engine.factory import create_llm_engine
 from paper_ingest.identity import discover
 from paper_ingest.phases import render_status, render_summary, run_ingest_phase, run_ocr_phase
-from paper_ingest.preflight import require_down, wait_llm_serving, wait_memory_ready, wait_ocr_ready
+from paper_ingest.preflight import (
+    require_down,
+    wait_llm_serving,
+    wait_memory_ready,
+    wait_ocr_documents_ready,
+    wait_ocr_ready,
+)
 from paper_ingest.state import StateStore
 from runtime_config import RuntimeConfig
+from tools.document_parser_ocr.documents_client import OcrDocumentsClient
 from tools.document_parser_ocr.tool import Document_Parser_OCR_Tool
 from tools.memory_graph.tool import Memory_Graph_Tool
 
@@ -36,11 +43,19 @@ def _build_parser() -> argparse.ArgumentParser:
     ocr_parser.add_argument(
         "--exclude", action="append", default=[], metavar="NAME", help="Exact basename; repeatable."
     )
+    ocr_parser.add_argument(
+        "--reocr",
+        action="append",
+        default=[],
+        metavar="PAPER_ID",
+        help="Exact paper id; repeatable. Re-OCR even if state says done "
+        "(e.g. stored document fails integrity).",
+    )
     ocr_parser.add_argument("--ocr-timeout-seconds", required=True, type=float)
     ocr_parser.add_argument("--ready-timeout-seconds", required=True, type=float)
 
     ingest_parser = subparsers.add_parser(
-        "ingest", help="Phase 2: metadata + memory ingest from the OCR cache"
+        "ingest", help="Phase 2: metadata + memory ingest from the OCR document store"
     )
     ingest_parser.add_argument("--work-dir", required=True, type=Path)
     ingest_parser.add_argument("--ingest-seconds-per-page", required=True, type=float)
@@ -78,10 +93,14 @@ def _run_ocr(args: argparse.Namespace, cfg: RuntimeConfig) -> int:
     # work dir must fail fast on the lock, not spend `ready_timeout_seconds` polling first.
     store = StateStore(args.work_dir)
     tool = Document_Parser_OCR_Tool()
+    documents = OcrDocumentsClient(cfg.ocr_documents_base_url, cfg.ocr_request_timeout_seconds)
     with store.exclusive_lock():
         require_down("LLM gateway", f"{cfg.llm_base_url}/models", "llm-down")
         wait_ocr_ready(cfg.ocr_base_url, args.ready_timeout_seconds)
-        summary = run_ocr_phase(identities, tool, store, args.ocr_timeout_seconds)
+        wait_ocr_documents_ready(cfg.ocr_documents_base_url, args.ready_timeout_seconds)
+        summary = run_ocr_phase(
+            identities, tool, documents, store, args.ocr_timeout_seconds, frozenset(args.reocr)
+        )
     logger.info("Phase 1 (OCR) finished:\n%s", render_summary(summary))
     return summary.exit_code
 
@@ -91,13 +110,17 @@ def _run_ingest(args: argparse.Namespace, cfg: RuntimeConfig) -> int:
     store = StateStore(args.work_dir)
     engine = create_llm_engine(is_multimodal=False)
     memory_tool = Memory_Graph_Tool()
+    documents = OcrDocumentsClient(cfg.ocr_documents_base_url, cfg.ocr_request_timeout_seconds)
     with store.exclusive_lock():
         require_down("OCR", f"{cfg.ocr_base_url}/healthz", "ocr-down")
         wait_llm_serving(
             cfg.llm_base_url, cfg.llm_api_key, cfg.llm_model, args.ready_timeout_seconds
         )
         wait_memory_ready(cfg.memory_base_url, args.ready_timeout_seconds)
-        summary = run_ingest_phase(engine, memory_tool, store, args.ingest_seconds_per_page)
+        wait_ocr_documents_ready(cfg.ocr_documents_base_url, args.ready_timeout_seconds)
+        summary = run_ingest_phase(
+            engine, memory_tool, documents, store, args.ingest_seconds_per_page
+        )
     logger.info("Phase 2 (ingest) finished:\n%s", render_summary(summary))
     return summary.exit_code
 

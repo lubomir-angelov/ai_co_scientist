@@ -14,9 +14,7 @@ router = APIRouter()
 
 
 @router.post("/v1/speech")
-async def speech(
-    request: SpeechRequest, services: Annotated[Services, Depends(get_services)]
-) -> StreamingResponse:
+async def speech(request: SpeechRequest, services: Annotated[Services, Depends(get_services)]) -> StreamingResponse:
     """Free-text speech: the text is spoken as given (no paper normalisation); never logged."""
     return await start_mp3_stream(
         services,

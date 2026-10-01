@@ -7,7 +7,7 @@ from voice_service.core.config import VoiceConfig
 from voice_service.core.errors import ConfigError
 
 REQUIRED = [
-    "VOICE_OCR_BASE_URL",
+    "VOICE_OCR_DOCUMENTS_BASE_URL",
     "VOICE_OCR_TIMEOUT_SECONDS",
     "VOICE_DATA_DIR",
     "VOICE_MODELS_MANIFEST",
@@ -26,7 +26,7 @@ def _env(tmp_path: Path) -> dict[str, str]:
     manifest = tmp_path / "m.json"
     manifest.write_text("{}")
     return {
-        "VOICE_OCR_BASE_URL": "http://ocr:8002/",
+        "VOICE_OCR_DOCUMENTS_BASE_URL": "http://ocr-documents:8008/",
         "VOICE_OCR_TIMEOUT_SECONDS": "60",
         "VOICE_DATA_DIR": str(data),
         "VOICE_MODELS_MANIFEST": str(manifest),
@@ -41,7 +41,7 @@ def _env(tmp_path: Path) -> dict[str, str]:
 
 def test_valid_env_parses(tmp_path: Path) -> None:
     cfg = VoiceConfig.from_mapping(_env(tmp_path))
-    assert cfg.ocr_base_url == "http://ocr:8002"
+    assert cfg.ocr_documents_base_url == "http://ocr-documents:8008"
     assert cfg.tts_speed == 1.0 and cfg.render_queue_max == 16
 
 
@@ -60,7 +60,7 @@ def test_missing_or_empty_var_raises_and_names_it(tmp_path: Path, name: str, bla
 @pytest.mark.parametrize(
     ("name", "value"),
     [
-        ("VOICE_OCR_BASE_URL", "ocr:8002"),
+        ("VOICE_OCR_DOCUMENTS_BASE_URL", "ocr-documents:8008"),
         ("VOICE_OCR_TIMEOUT_SECONDS", "0"),
         ("VOICE_OCR_TIMEOUT_SECONDS", "abc"),
         ("VOICE_TTS_SPEED", "0.4"),

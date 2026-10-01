@@ -33,9 +33,7 @@ def _cut_after(window: list[PhonemeToken]) -> int:
         for position in range(len(window) - 1, -1, -1):
             if wanted(window[position]):
                 return position + 1
-    raise PhonemeWindowError(
-        f"no break point inside a {len(window)}-token run that exceeds the phoneme window"
-    )
+    raise PhonemeWindowError(f"no break point inside a {len(window)}-token run that exceeds the phoneme window")
 
 
 def _seal(tokens: list[PhonemeToken]) -> PhonemeWindow:

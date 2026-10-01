@@ -24,9 +24,18 @@ def write_section(store: RenderStore, doc_id: str, key: str, index: int, data: b
 
 def rendered(index: int, data: bytes) -> SectionRenderRecord:
     return SectionRenderRecord(
-        index=index, status="rendered", file_name=section_file_name(index),
-        sha256=hashlib.sha256(data).hexdigest(), bytes=len(data), audio_seconds=1.0, windows=1,
-        unspoken_tokens=0, synth_seconds=0.1, phonemize_seconds=0.01, error=None, finished_at=datetime.now(UTC),
+        index=index,
+        status="rendered",
+        file_name=section_file_name(index),
+        sha256=hashlib.sha256(data).hexdigest(),
+        bytes=len(data),
+        audio_seconds=1.0,
+        windows=1,
+        unspoken_tokens=0,
+        synth_seconds=0.1,
+        phonemize_seconds=0.01,
+        error=None,
+        finished_at=datetime.now(UTC),
     )
 
 
@@ -115,8 +124,17 @@ def test_verify_detects_missing_and_tampered_files(tmp_path: Path) -> None:
 
 def test_manifest_validator_rejects_inconsistent_records() -> None:
     base = dict(
-        index=0, file_name=None, sha256=None, bytes=None, audio_seconds=None, windows=None,
-        unspoken_tokens=None, synth_seconds=None, phonemize_seconds=None, error=None, finished_at=datetime.now(UTC),
+        index=0,
+        file_name=None,
+        sha256=None,
+        bytes=None,
+        audio_seconds=None,
+        windows=None,
+        unspoken_tokens=None,
+        synth_seconds=None,
+        phonemize_seconds=None,
+        error=None,
+        finished_at=datetime.now(UTC),
     )
     with pytest.raises(ValidationError):
         SectionRenderRecord(status="rendered", **base)  # rendered with nothing set

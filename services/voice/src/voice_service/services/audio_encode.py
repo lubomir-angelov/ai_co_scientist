@@ -108,9 +108,7 @@ class Mp3StreamEncoder:
         try:
             capacity = fcntl.fcntl(write_fd, fcntl.F_GETPIPE_SZ)
             if capacity < 2 * _MAX_FEED_BYTES:
-                raise RuntimeError(
-                    f"OS pipe capacity {capacity} bytes is below the required {2 * _MAX_FEED_BYTES}"
-                )
+                raise RuntimeError(f"OS pipe capacity {capacity} bytes is below the required {2 * _MAX_FEED_BYTES}")
             os.set_blocking(read_fd, False)
             self._writer: sf.SoundFile | None = _open_mp3_writer(write_fd, sample_rate)
         except BaseException:

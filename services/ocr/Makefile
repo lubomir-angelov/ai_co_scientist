@@ -7,6 +7,7 @@ RUFF    := $(if $(wildcard $(VENV)/bin/ruff),$(VENV)/bin/ruff,ruff)
 COMPOSE := docker compose -f compose.yaml
 
 HOST_PORT ?= 8002
+DOCS_PORT ?= 8008
 
 export PYTHONPATH := $(CURDIR)/src:$(CURDIR)/../common/src:$(PYTHONPATH)
 
@@ -22,6 +23,7 @@ help:
 	@echo "make up / down     - start / stop the OCR container"
 	@echo "make logs / ps     - compose logs / status"
 	@echo "make health        - query /healthz on localhost:$(HOST_PORT)"
+	@echo "make health-documents - query the GPU-free ocr-documents reader on localhost:$(DOCS_PORT)"
 
 .PHONY: install
 install:
@@ -79,3 +81,7 @@ ps:
 .PHONY: health
 health:
 	@curl -sf http://localhost:$(HOST_PORT)/healthz && echo || { echo "ocr not reachable on :$(HOST_PORT)"; exit 1; }
+
+.PHONY: health-documents
+health-documents:
+	@curl -sf http://localhost:$(DOCS_PORT)/healthz && echo || { echo "ocr-documents not reachable on :$(DOCS_PORT)"; exit 1; }

@@ -21,6 +21,7 @@ from conftest import (
     make_manifest,
 )
 from fastapi.testclient import TestClient
+from shared_library.data_contracts import OcrDocumentError, OcrDocumentErrorCode
 
 from voice_service.app import create_app
 from voice_service.models.schemas import MAX_TRANSCRIPTION_UPLOAD_BYTES, OmittedBlock
@@ -50,7 +51,9 @@ class Env:
         if doc_id.startswith("paper-"):
             document = load_ocr_fixture().model_copy(update={"doc_id": doc_id})
             return httpx.Response(200, content=document.model_dump_json())
-        return httpx.Response(404)
+        return httpx.Response(
+            404, json=OcrDocumentError(code=OcrDocumentErrorCode.NOT_FOUND, doc_id=doc_id).model_dump(mode="json")
+        )
 
     def _ocr(self, request: httpx.Request) -> httpx.Response:
         self.ocr_paths.append(request.url.path)
@@ -287,10 +290,17 @@ def test_render_submit_status_download_and_playlist(client: TestClient) -> None:
 
 
 def test_render_errors(client: TestClient, env: Env) -> None:
-    assert client.post(f"/v1/papers/{DOC}/renders", json={"section_indices": [1]}).json()["code"] == "script_not_prepared"
+    assert (
+        client.post(f"/v1/papers/{DOC}/renders", json={"section_indices": [1]}).json()["code"] == "script_not_prepared"
+    )
     client.post(f"/v1/papers/{DOC}/script")
-    assert client.post(f"/v1/papers/{DOC}/renders", json={"section_indices": [99]}).json()["code"] == "section_not_found"
-    assert client.post(f"/v1/papers/{DOC}/renders", json={"section_indices": [3]}).json()["code"] == "section_not_speakable"
+    assert (
+        client.post(f"/v1/papers/{DOC}/renders", json={"section_indices": [99]}).json()["code"] == "section_not_found"
+    )
+    assert (
+        client.post(f"/v1/papers/{DOC}/renders", json={"section_indices": [3]}).json()["code"]
+        == "section_not_speakable"
+    )
     assert client.post(f"/v1/papers/{DOC}/renders", json={"section_indices": []}).status_code == 422
     assert client.post(f"/v1/papers/{DOC}/renders", json={"section_indices": [1, 1]}).status_code == 422
     absent = "0" * 64
@@ -345,9 +355,7 @@ def test_render_queue_full_is_429(tmp_path: Path, exit_recorder: ExitRecorder) -
         release.set()
 
 
-def test_same_render_resubmitted_while_active_is_merged_not_queued(
-    tmp_path: Path, exit_recorder: ExitRecorder
-) -> None:
+def test_same_render_resubmitted_while_active_is_merged_not_queued(tmp_path: Path, exit_recorder: ExitRecorder) -> None:
     env = Env(tmp_path, exit_recorder, VOICE_RENDER_QUEUE_MAX=1)
     release = threading.Event()
     original = env.tts.synthesize
@@ -406,16 +414,12 @@ def test_transcription_media_type_and_language_rejections(client: TestClient, en
     )
     assert bad_language.status_code == 422 and bad_language.json()["code"] == "unsupported_language"
 
-    undecodable = client.post(
-        "/v1/transcriptions", content=UNDECODABLE_MARKER, headers={"content-type": "audio/wav"}
-    )
+    undecodable = client.post("/v1/transcriptions", content=UNDECODABLE_MARKER, headers={"content-type": "audio/wav"})
     assert undecodable.status_code == 422 and undecodable.json()["code"] == "audio_undecodable"
     assert env.stt.calls[-1][1] is None and _spool_files() == []
 
 
-def test_declared_oversize_is_413_before_any_byte_is_read(
-    client: TestClient, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_declared_oversize_is_413_before_any_byte_is_read(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("voice_service.api.routes_stt.MAX_TRANSCRIPTION_UPLOAD_BYTES", 10)
 
     async def must_not_read(request: object) -> Path:
@@ -470,9 +474,18 @@ async def _call_and_disconnect(app: object, path: str) -> None:
         await asyncio.sleep(0)
 
     scope = {
-        "type": "http", "asgi": {"version": "3.0"}, "http_version": "1.1", "method": "GET", "scheme": "http",
-        "path": path, "raw_path": path.encode(), "query_string": b"", "headers": [], "root_path": "",
-        "server": ("test", 80), "client": ("peer", 1),
+        "type": "http",
+        "asgi": {"version": "3.0"},
+        "http_version": "1.1",
+        "method": "GET",
+        "scheme": "http",
+        "path": path,
+        "raw_path": path.encode(),
+        "query_string": b"",
+        "headers": [],
+        "root_path": "",
+        "server": ("test", 80),
+        "client": ("peer", 1),
     }
     await app(scope, receive, send)  # type: ignore[operator]
 

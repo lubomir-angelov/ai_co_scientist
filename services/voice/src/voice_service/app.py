@@ -46,7 +46,7 @@ def create_app(
     gate = GpuGate()
     store = RenderStore(config.data_dir)
     ocr_http = httpx.AsyncClient(
-        base_url=config.ocr_base_url, timeout=config.ocr_timeout_seconds, transport=ocr_transport
+        base_url=config.ocr_documents_base_url, timeout=config.ocr_timeout_seconds, transport=ocr_transport
     )
     renders = RenderQueue(
         store=store,
@@ -64,7 +64,7 @@ def create_app(
         logger.info(
             "voice service starting",
             extra={
-                "ocr_base_url": config.ocr_base_url,
+                "ocr_documents_base_url": config.ocr_documents_base_url,
                 "data_dir": str(config.data_dir),
                 "voice": config.tts_voice,
                 "speed": config.tts_speed,

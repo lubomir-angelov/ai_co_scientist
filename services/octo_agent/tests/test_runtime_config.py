@@ -13,6 +13,7 @@ _ENV_VARS = (
     "LLM_MODEL",
     "LLM_REQUEST_TIMEOUT_SECONDS",
     "OCR_BASE_URL",
+    "OCR_DOCUMENTS_BASE_URL",
     "OCR_AUTH_HEADER",
     "OCR_REQUEST_TIMEOUT_SECONDS",
     "MEMORY_BASE_URL",
@@ -31,6 +32,7 @@ def test_defaults_when_nothing_is_set(monkeypatch: pytest.MonkeyPatch) -> None:
     assert cfg.llm_model == "Qwen3.8-27B-UD-Q4_K_XL"
     assert cfg.llm_request_timeout_seconds == 300.0
     assert cfg.ocr_base_url == "http://localhost:8002"
+    assert cfg.ocr_documents_base_url == "http://localhost:8008"
     assert cfg.ocr_auth_header is None
     assert cfg.ocr_request_timeout_seconds == 3600.0
     assert cfg.memory_base_url == "http://localhost:8005"
@@ -44,7 +46,12 @@ def test_llm_request_timeout_is_read_from_env(monkeypatch: pytest.MonkeyPatch) -
 
 @pytest.mark.parametrize(
     "var,value",
-    [("LLM_API_KEY", ""), ("LLM_MODEL", "  "), ("OCR_AUTH_HEADER", "")],
+    [
+        ("LLM_API_KEY", ""),
+        ("LLM_MODEL", "  "),
+        ("OCR_AUTH_HEADER", ""),
+        ("OCR_DOCUMENTS_BASE_URL", ""),
+    ],
 )
 def test_set_but_empty_string_field_raises(
     monkeypatch: pytest.MonkeyPatch, var: str, value: str
@@ -68,11 +75,13 @@ def test_reads_env_at_call_time(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("LLM_BASE_URL", "http://gateway:9000/v1")
     monkeypatch.setenv("OCR_AUTH_HEADER", "Bearer secret")
     monkeypatch.setenv("OCR_REQUEST_TIMEOUT_SECONDS", "45")
+    monkeypatch.setenv("OCR_DOCUMENTS_BASE_URL", "http://ocr-documents:8008")
 
     cfg = RuntimeConfig.from_env()
 
     assert cfg.llm_base_url == "http://gateway:9000/v1"
     assert cfg.ocr_auth_header == "Bearer secret"
+    assert cfg.ocr_documents_base_url == "http://ocr-documents:8008"
     assert cfg.ocr_request_timeout_seconds == 45.0
 
     monkeypatch.setenv("LLM_BASE_URL", "http://other:9000/v1")

@@ -17,7 +17,9 @@ def _response(status: int, body: dict) -> MagicMock:
 
 
 def test_connection_refused_counts_as_down(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(preflight.requests, "get", MagicMock(side_effect=requests.ConnectionError()))
+    monkeypatch.setattr(
+        preflight.requests, "get", MagicMock(side_effect=requests.ConnectionError())
+    )
     preflight.require_down("LLM gateway", "http://llm:9000/v1/models", "llm-down")  # does not raise
 
 
@@ -49,7 +51,9 @@ def test_wait_llm_serving_succeeds_when_model_listed(monkeypatch: pytest.MonkeyP
     get = MagicMock(return_value=_response(200, {"data": [{"id": "wanted-model"}]}))
     monkeypatch.setattr(preflight.requests, "get", get)
 
-    preflight.wait_llm_serving("http://llm:9000/v1", "key", "wanted-model", 10, sleep=lambda s: None)
+    preflight.wait_llm_serving(
+        "http://llm:9000/v1", "key", "wanted-model", 10, sleep=lambda s: None
+    )
 
 
 def test_waiting_times_out_with_last_observed_state(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -64,3 +68,20 @@ def test_waiting_times_out_with_last_observed_state(monkeypatch: pytest.MonkeyPa
             "http://memory:8005", 10, sleep=sleeps.append, now=lambda: next(fake_clock)
         )
     assert sleeps  # it polled at least once before giving up
+
+
+def test_wait_ocr_documents_ready_succeeds_when_ready(monkeypatch: pytest.MonkeyPatch) -> None:
+    get = MagicMock(return_value=_response(200, {"ready": True}))
+    monkeypatch.setattr(preflight.requests, "get", get)
+
+    preflight.wait_ocr_documents_ready("http://ocr-documents:8008", 10, sleep=lambda s: None)
+
+    assert get.call_args.args[0] == "http://ocr-documents:8008/healthz"
+
+
+def test_wait_ocr_documents_ready_fails_when_not_ready(monkeypatch: pytest.MonkeyPatch) -> None:
+    get = MagicMock(return_value=_response(503, {"ready": False}))
+    monkeypatch.setattr(preflight.requests, "get", get)
+
+    with pytest.raises(preflight.ServiceNotReadyError, match="OCR document reader.*HTTP 503"):
+        preflight.wait_ocr_documents_ready("http://ocr-documents:8008", 0.0, sleep=lambda s: None)

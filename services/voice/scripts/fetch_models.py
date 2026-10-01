@@ -1,9 +1,9 @@
 """Build-time model tooling; never imported by the service. SSOT for model identity: model_pins.json.
 
-  fetch_models.py models   download the pinned Kokoro / faster-whisper revisions into /opt/models,
-                           verify the required files and write the runtime manifest
-  fetch_models.py g2p      print the pip requirement (URL#sha256=...) for the pinned spaCy model wheel
-  fetch_models.py pin-g2p  developer command: download the spaCy wheel once and record its sha256
+fetch_models.py models   download the pinned Kokoro / faster-whisper revisions into /opt/models,
+                         verify the required files and write the runtime manifest
+fetch_models.py g2p      print the pip requirement (URL#sha256=...) for the pinned spaCy model wheel
+fetch_models.py pin-g2p  developer command: download the spaCy wheel once and record its sha256
 """
 
 from __future__ import annotations
@@ -37,7 +37,11 @@ def _require(mapping: dict[str, Any], key: str, where: str) -> Any:
 
 def load_pins(path: Path) -> dict[str, Any]:
     pins = json.loads(path.read_text(encoding="utf-8"))
-    for section, fields in (("tts", ("repo_id", "revision")), ("stt", ("repo_id", "revision", "compute_type")), ("g2p", ("spacy_model_wheel", "sha256"))):
+    for section, fields in (
+        ("tts", ("repo_id", "revision")),
+        ("stt", ("repo_id", "revision", "compute_type")),
+        ("g2p", ("spacy_model_wheel", "sha256")),
+    ):
         block = _require(pins, section, "pins")
         for field in fields:
             _require(block, field, section)
@@ -65,8 +69,12 @@ def _verify_files(directory: Path, required: list[str]) -> None:
 def fetch_models() -> None:
     pins = load_pins(PINS_PATH)
     tts_dir, stt_dir = MODELS_ROOT / "kokoro", MODELS_ROOT / "whisper"
-    snapshot_download(pins["tts"]["repo_id"], revision=pins["tts"]["revision"], local_dir=tts_dir, allow_patterns=TTS_ALLOW_PATTERNS)
-    snapshot_download(pins["stt"]["repo_id"], revision=pins["stt"]["revision"], local_dir=stt_dir, allow_patterns=STT_ALLOW_PATTERNS)
+    snapshot_download(
+        pins["tts"]["repo_id"], revision=pins["tts"]["revision"], local_dir=tts_dir, allow_patterns=TTS_ALLOW_PATTERNS
+    )
+    snapshot_download(
+        pins["stt"]["repo_id"], revision=pins["stt"]["revision"], local_dir=stt_dir, allow_patterns=STT_ALLOW_PATTERNS
+    )
     _verify_files(tts_dir, TTS_REQUIRED_FILES)
     if not any((tts_dir / "voices").glob("*.pt")):
         raise RuntimeError(f"{tts_dir}/voices: no voice packs downloaded")

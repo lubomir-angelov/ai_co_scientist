@@ -9,7 +9,7 @@ services:
       dockerfile: services/voice/Dockerfile
     restart: unless-stopped
     environment:
-      VOICE_OCR_BASE_URL: ${VOICE_OCR_BASE_URL:-http://ocr:8002}
+      VOICE_OCR_DOCUMENTS_BASE_URL: ${VOICE_OCR_DOCUMENTS_BASE_URL:-http://ocr-documents:8008}
       VOICE_OCR_TIMEOUT_SECONDS: ${VOICE_OCR_TIMEOUT_SECONDS:-60}
       VOICE_DATA_DIR: /data
       VOICE_TTS_VOICE: ${VOICE_TTS_VOICE:-af_heart}

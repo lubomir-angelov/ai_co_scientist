@@ -1,13 +1,64 @@
 """CLAUDE.md §2 guard: no stand-in literal in a parameter / dataclass / pydantic Field default.
 
-_DENYLIST is the single source of truth for the forbidden missing-data words. ZERO-gate.
+_DENYLIST is the single source of truth for the forbidden missing-data words in this subtree. ZERO-gate.
+Self-contained per-subtree mirror of services/voice/tests/architecture/test_no_placeholder_default.py
+(CLAUDE.md: one copy of the guard per subtree); keep _DENYLIST byte-identical to that sibling copy.
 """
 
 from __future__ import annotations
 
 import ast
+from collections.abc import Iterator
+from dataclasses import dataclass
+from pathlib import Path
 
-from _scan import Hit, SymbolWalker, source_files
+SRC_DIR = Path(__file__).resolve().parents[2] / "src"
+
+
+@dataclass(frozen=True)
+class Hit:
+    rel_path: str
+    line: int
+    symbol: str
+    detail: str
+
+
+def source_files() -> Iterator[tuple[str, ast.Module]]:
+    for path in sorted(SRC_DIR.rglob("*.py")):
+        yield (
+            path.relative_to(SRC_DIR).as_posix(),
+            ast.parse(path.read_text(encoding="utf-8")),
+        )
+
+
+class SymbolWalker(ast.NodeVisitor):
+    """NodeVisitor that tracks the enclosing function/class symbol (module level = "<module>")."""
+
+    def __init__(self) -> None:
+        self._stack: list[str] = []
+
+    @property
+    def symbol(self) -> str:
+        return ".".join(self._stack) if self._stack else "<module>"
+
+    def _on_enter(self, node: ast.AST) -> None:
+        """Hook run with the symbol already pushed, so findings on ``node`` carry its own name."""
+
+    def _scoped(self, node: ast.AST, name: str) -> None:
+        self._stack.append(name)
+        self._on_enter(node)
+        self.generic_visit(node)
+        self._stack.pop()
+
+    def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
+        self._scoped(node, node.name)
+
+    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
+        self._scoped(node, node.name)
+
+    def visit_ClassDef(self, node: ast.ClassDef) -> None:
+        self._scoped(node, node.name)
+
 
 _DENYLIST: frozenset[str] = frozenset(
     {
@@ -39,7 +90,11 @@ _FIELD_CALLEES = frozenset({"Field", "field"})
 
 
 def _is_denied(node: ast.expr | None) -> str | None:
-    if isinstance(node, ast.Constant) and isinstance(node.value, str) and node.value.casefold() in _DENYLIST:
+    if (
+        isinstance(node, ast.Constant)
+        and isinstance(node.value, str)
+        and node.value.casefold() in _DENYLIST
+    ):
         return node.value
     return None
 
@@ -53,7 +108,9 @@ class _DefaultScanner(SymbolWalker):
     def _flag(self, node: ast.expr | None, line: int, where: str) -> None:
         word = _is_denied(node)
         if word is not None and (self.rel_path, self.symbol) not in _ALLOWLIST:
-            self.hits.append(Hit(self.rel_path, line, self.symbol, f"{where} default {word!r}"))
+            self.hits.append(
+                Hit(self.rel_path, line, self.symbol, f"{where} default {word!r}")
+            )
 
     def _check_args(self, node: ast.FunctionDef | ast.AsyncFunctionDef) -> None:
         for default in [*node.args.defaults, *node.args.kw_defaults]:
@@ -68,7 +125,11 @@ class _DefaultScanner(SymbolWalker):
         self.generic_visit(node)
 
     def visit_Call(self, node: ast.Call) -> None:
-        callee = node.func.attr if isinstance(node.func, ast.Attribute) else getattr(node.func, "id", None)
+        callee = (
+            node.func.attr
+            if isinstance(node.func, ast.Attribute)
+            else getattr(node.func, "id", None)
+        )
         if callee in _FIELD_CALLEES:
             if node.args:
                 self._flag(node.args[0], node.lineno, "Field")
@@ -101,12 +162,18 @@ class _CoalesceScanner(SymbolWalker):
             and len(node.args) == 2
             and self._is_str_literal(node.args[1])
         ):
-            self.hits.append(Hit(self.rel_path, node.lineno, self.symbol, ".get(key, <str literal>)"))
+            self.hits.append(
+                Hit(self.rel_path, node.lineno, self.symbol, ".get(key, <str literal>)")
+            )
         self.generic_visit(node)
 
     def visit_BoolOp(self, node: ast.BoolOp) -> None:
-        if isinstance(node.op, ast.Or) and any(self._is_str_literal(v) for v in node.values[1:]):
-            self.hits.append(Hit(self.rel_path, node.lineno, self.symbol, "x or <str literal>"))
+        if isinstance(node.op, ast.Or) and any(
+            self._is_str_literal(v) for v in node.values[1:]
+        ):
+            self.hits.append(
+                Hit(self.rel_path, node.lineno, self.symbol, "x or <str literal>")
+            )
         self.generic_visit(node)
 
 
@@ -165,7 +232,9 @@ class M(BaseModel):
     )
 
 
-def test_guard_flags_field_call_forms_and_reports_parameter_defaults_under_their_function() -> None:
+def test_guard_flags_field_call_forms_and_reports_parameter_defaults_under_their_function() -> (
+    None
+):
     planted = """
 from dataclasses import dataclass, field
 from pydantic import Field
@@ -180,7 +249,9 @@ class M:
 class K:
     def method(self, name: str = "tbd"): ...
 """
-    assert sorted((h.symbol, h.detail) for h in scan_defaults(planted, "planted.py")) == sorted(
+    assert sorted(
+        (h.symbol, h.detail) for h in scan_defaults(planted, "planted.py")
+    ) == sorted(
         [
             ("A", "Field default 'unknown'"),
             ("M", "Field default 'unknown'"),
@@ -195,5 +266,10 @@ def test_guard_accepts_honest_defaults() -> None:
 
 
 def test_coalescing_guard_flags_planted_violations() -> None:
-    planted = 'd = {}\nx = d.get("k", "unknown")\ny = d["k"] or "tbd"\nz = d.get("k", 0)\n'
-    assert [h.detail for h in scan_coalescing(planted, "p.py")] == [".get(key, <str literal>)", "x or <str literal>"]
+    planted = (
+        'd = {}\nx = d.get("k", "unknown")\ny = d["k"] or "tbd"\nz = d.get("k", 0)\n'
+    )
+    assert [h.detail for h in scan_coalescing(planted, "p.py")] == [
+        ".get(key, <str literal>)",
+        "x or <str literal>",
+    ]
