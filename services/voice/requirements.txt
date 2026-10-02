@@ -6,6 +6,7 @@ httpx==0.28.1
 kokoro==0.9.4
 misaki[en]==0.9.4
 faster-whisper==1.2.1
+av==18.1.0  # faster-whisper 1.2.1 passes av.open(metadata_errors=...), which PyAV 19 removed
 ctranslate2>=4.6.0,<5
 soundfile==0.14.0
 numpy
